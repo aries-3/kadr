@@ -1,0 +1,21 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+
+# Maven Wrapper downloads
+.mvn/wrapper/maven-wrapper.jar
+
+# Model files and local data never go into the repository
+*.onnx
+*.mv.db
+*.trace.db

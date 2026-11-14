@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.teacode.kazakov.kadr</groupId>
+    <artifactId>kadr-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Kadr</name>
+    <description>Local photo catalog with semantic search</description>
+
+    <modules>
+        <module>domain</module>
+        <module>application</module>
+        <module>adapters/persistence-h2</module>
+        <module>adapters/index-lucene</module>
+        <module>adapters/ml-onnx</module>
+        <module>adapters/imaging</module>
+        <module>adapters/fs</module>
+        <module>server</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+
+        <!-- Dependencies not managed by Spring Boot -->
+        <lucene.version>10.6.0</lucene.version>
+        <onnxruntime.version>1.31.1</onnxruntime.version>
+        <djl-tokenizers.version>0.40.0</djl-tokenizers.version>
+        <twelvemonkeys.version>3.15.3</twelvemonkeys.version>
+        <metadata-extractor.version>2.22.0</metadata-extractor.version>
+
+        <!-- Plugins not managed by Spring Boot -->
+        <openapi-generator.version>7.27.0</openapi-generator.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Kadr modules -->
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-persistence-h2</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-index-lucene</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-ml-onnx</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-imaging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-fs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Third-party -->
+            <dependency>
+                <groupId>org.apache.lucene</groupId>
+                <artifactId>lucene-core</artifactId>
+                <version>${lucene.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.microsoft.onnxruntime</groupId>
+                <artifactId>onnxruntime</artifactId>
+                <version>${onnxruntime.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.djl.huggingface</groupId>
+                <artifactId>tokenizers</artifactId>
+                <version>${djl-tokenizers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.twelvemonkeys.imageio</groupId>
+                <artifactId>imageio-jpeg</artifactId>
+                <version>${twelvemonkeys.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.twelvemonkeys.imageio</groupId>
+                <artifactId>imageio-webp</artifactId>
+                <version>${twelvemonkeys.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.drewnoakes</groupId>
+                <artifactId>metadata-extractor</artifactId>
+                <version>${metadata-extractor.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Nullness annotations, used by every module: packages are @NullMarked, so only
+             nullable types are annotated. Version from Spring Boot -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <compilerArgs>
+                            <!-- Emit package-info.class so modules with only package docs don't build empty jars -->
+                            <arg>-Xpkginfo:always</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.openapitools</groupId>
+                    <artifactId>openapi-generator-maven-plugin</artifactId>
+                    <version>${openapi-generator.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-build-environment</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[21,)</version>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Runs *IT tests during `verify`; plugin version and executions come from the Spring Boot parent -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

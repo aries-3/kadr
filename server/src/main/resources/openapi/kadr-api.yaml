@@ -1,0 +1,391 @@
+openapi: 3.0.3
+
+info:
+  title: Kadr API
+  version: 0.1.0
+  description: |
+    Local photo catalog with semantic search: find photos by a text description
+    or by an example image.
+
+    Errors are returned as RFC 9457 Problem Details (`application/problem+json`).
+
+servers:
+  - url: http://127.0.0.1:8080
+
+tags:
+  - name: Libraries
+    description: Folders added to the index
+  - name: Search
+    description: Semantic search by text or by image
+  - name: Photos
+    description: Photos in the catalog
+
+paths:
+  /api/libraries:
+    get:
+      tags: [Libraries]
+      operationId: listLibraries
+      summary: List folders added to the index
+      responses:
+        '200':
+          description: All added folders with their indexing status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Library'
+    post:
+      tags: [Libraries]
+      operationId: addLibrary
+      summary: Add a folder to the index
+      description: |
+        The folder is scanned and indexed in the background; the response returns at once.
+        Track progress with `GET /api/libraries/{libraryId}`.
+
+        The path is a folder on the machine running the service. Nested folders are allowed:
+        a file is indexed once, however many added folders contain it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddLibraryRequest'
+      responses:
+        '202':
+          description: Folder added; scanning has started
+          headers:
+            Location:
+              description: URL of the added folder
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Library'
+        '400':
+          description: The path is not absolute, doesn't exist, isn't a folder or isn't readable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: The folder is already added
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/libraries/{libraryId}:
+    get:
+      tags: [Libraries]
+      operationId: getLibrary
+      summary: Get a folder with its indexing status
+      parameters:
+        - $ref: '#/components/parameters/LibraryId'
+      responses:
+        '200':
+          description: The folder with its indexing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Library'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/libraries/{libraryId}/rescan:
+    post:
+      tags: [Libraries]
+      operationId: rescanLibrary
+      summary: Scan a folder again
+      description: |
+        Incremental: finds new, changed and missing files; unchanged files aren't read.
+        If a scan of this folder is already running, no new scan starts.
+      parameters:
+        - $ref: '#/components/parameters/LibraryId'
+      responses:
+        '202':
+          description: Scan started or already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Library'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/search/text:
+    post:
+      tags: [Search]
+      operationId: searchByText
+      summary: Find photos by a text description
+      description: Works in many languages, Russian included. Photos are ranked by similarity; there is no cut-off threshold.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextSearchRequest'
+      responses:
+        '200':
+          description: Photos ordered by similarity, best first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          description: The query is blank or too long, or the limit is out of range
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/search/image:
+    post:
+      tags: [Search]
+      operationId: searchByImage
+      summary: Find photos similar to an uploaded image
+      description: The uploaded image is used for this search only; it isn't stored or added to the catalog.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG or WebP image
+                limit:
+                  $ref: '#/components/schemas/Limit'
+      responses:
+        '200':
+          description: Photos ordered by similarity, best first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+        '400':
+          description: The image can't be decoded or has too many pixels, or the limit is out of range
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '413':
+          description: The file is larger than the upload limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '415':
+          description: The image format isn't supported
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/photos/{photoId}/file:
+    get:
+      tags: [Photos]
+      operationId: getPhotoFile
+      summary: Download the original file of a photo
+      description: Serves one of the photo's files that is present on disk. Only files registered in the catalog are served.
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '200':
+          description: The original file
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    LibraryId:
+      name: libraryId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PhotoId:
+      name: photoId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+  schemas:
+    AddLibraryRequest:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Absolute path to a folder on the machine running the service
+          example: /home/user/Pictures
+
+    Library:
+      type: object
+      required: [id, path, status, files, indexed, pending, failed]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        path:
+          type: string
+          description: Absolute, normalized path of the folder
+          example: /home/user/Pictures
+        status:
+          $ref: '#/components/schemas/LibraryStatus'
+        files:
+          type: integer
+          format: int64
+          description: Files found in the folder and present on disk
+          example: 12450
+        indexed:
+          type: integer
+          format: int64
+          description: Photos with an embedding of the current model
+          example: 8000
+        pending:
+          type: integer
+          format: int64
+          description: Photos waiting to be indexed
+          example: 4400
+        failed:
+          type: integer
+          format: int64
+          description: Photos that couldn't be indexed
+          example: 50
+        scanError:
+          type: string
+          nullable: true
+          description: Why the last scan failed, e.g. the folder is unavailable
+        lastScanStartedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastScanFinishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    LibraryStatus:
+      type: string
+      enum: [SCANNING, INDEXING, READY, UNAVAILABLE]
+      description: |
+        - `SCANNING` — the folder is being scanned
+        - `INDEXING` — the scan is finished, photos are waiting to be indexed
+        - `READY` — everything found is indexed or failed
+        - `UNAVAILABLE` — the folder can't be read, e.g. a disk is unmounted
+
+    TextSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: What to look for, in natural language
+          example: собака на пляже на закате
+        limit:
+          $ref: '#/components/schemas/Limit'
+
+    Limit:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 200
+      default: 20
+      description: Maximum number of photos to return
+
+    SearchResult:
+      type: object
+      required: [modelId, items]
+      properties:
+        modelId:
+          type: string
+          description: Embedding model that produced the ranking
+          example: siglip2-base-patch16-224
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+
+    SearchHit:
+      type: object
+      required: [photoId, score, files]
+      properties:
+        photoId:
+          type: integer
+          format: int64
+          example: 1842
+        score:
+          type: number
+          format: double
+          description: |
+            Cosine similarity between the query and the photo. Only the order is meaningful:
+            absolute values depend on the model and on the query type.
+          example: 0.27
+        files:
+          type: array
+          description: |
+            Files of the photo present on disk; a photo can be stored in several places.
+            Photos without a present file are left out of the results.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PhotoFile'
+
+    PhotoFile:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: Absolute path of the file
+          example: /home/user/Pictures/2023/07/IMG_20230715_183012.jpg
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 Problem Details
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
