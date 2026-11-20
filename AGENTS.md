@@ -23,6 +23,12 @@ Nullness is declared with [JSpecify](https://jspecify.dev) (`org.jspecify.annota
 - Bean Validation `@NotNull` is not a nullness annotation: it checks external input (request bodies, configuration properties) at runtime and stays where such input may be missing.
 - Code generated from the API contract is not marked.
 
+### Javadoc
+
+- Every record component, in every module, is described by a `@param` tag in the record's Javadoc.
+- In `domain` — the model and the ports the other modules build on — every public method and constructor has Javadoc with a `@param` for each parameter, a `@return` for the result and a `@throws` for each checked exception. A method without parameters may use `{@return ...}` alone.
+- Code generated from the API contract is documented by the contract.
+
 ## Git
 
 ### Every file change goes to the index

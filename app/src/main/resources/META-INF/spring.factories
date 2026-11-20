@@ -1,0 +1,2 @@
+org.springframework.context.ApplicationContextInitializer=\
+com.teacode.kazakov.kadr.app.config.DataDirectoryInitializer

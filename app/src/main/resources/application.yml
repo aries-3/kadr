@@ -1,0 +1,28 @@
+kadr:
+  data-dir: ${user.home}/.kadr
+  model:
+    id: siglip2-base-patch16-224
+
+spring:
+  application:
+    name: kadr
+  datasource:
+    # Spring closes the database on shutdown; H2's own shutdown hook would close it
+    # before background work has stopped
+    url: jdbc:h2:file:${kadr.data-dir}/catalog;DB_CLOSE_ON_EXIT=FALSE
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  address: 127.0.0.1
+  port: 8080
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      # Free space matters where the service writes
+      path: ${kadr.data-dir}

@@ -28,18 +28,17 @@ Out of scope: video, HEIC and RAW, thumbnails, EXIF metadata and search filters,
 
 ```
 kadr/
-├── domain/                 kadr-domain           entities and ports; no frameworks
-├── application/            kadr-application      use cases
-├── adapters/
-│   ├── persistence-h2/     kadr-persistence-h2   JdbcClient repositories, Flyway migrations
-│   ├── index-lucene/       kadr-index-lucene     VectorIndex on Lucene
-│   ├── ml-onnx/            kadr-ml-onnx          EmbeddingModel on ONNX Runtime
-│   ├── imaging/            kadr-imaging          decoding, EXIF orientation
-│   └── fs/                 kadr-fs               folder walking, identity hash
-└── server/                 kadr-server           Spring Boot application, REST, wiring
+├── domain/            kadr-domain           entities and ports; no frameworks
+├── core/              kadr-core             use cases
+├── persistence-h2/    kadr-persistence-h2   adapter: JdbcClient repositories, Flyway migrations
+├── index-lucene/      kadr-index-lucene     adapter: VectorIndex on Lucene
+├── ml-onnx/           kadr-ml-onnx          adapter: EmbeddingModel on ONNX Runtime
+├── imaging/           kadr-imaging          adapter: decoding, EXIF orientation
+├── fs/                kadr-fs               adapter: folder walking, identity hash
+└── app/               kadr-app              Spring Boot application: REST, wiring, executable jar
 ```
 
-`domain` and `application` don't depend on Spring; adapters don't depend on each other.
+The modules are flat: they share nothing but the root POM. `domain` and `core` don't depend on Spring; adapters depend only on `domain` and not on each other; `app` wires everything.
 
 ## 3. Approach
 
@@ -83,11 +82,11 @@ Tasks:
    - Maven Enforcer: Java 21, Maven 3.9+.
 2. Maven Wrapper; `.gitignore` (`target/`, `.idea/`, `*.iml`, `*.onnx`, …).
 3. All eight modules with the dependency rules from §2.
-4. `kadr-server`:
+4. `kadr-app`:
    - application class, `application.yml`, `@ConfigurationProperties` record for `kadr.*`;
    - data directory created on startup;
    - H2 datasource (`DB_CLOSE_ON_EXIT=FALSE`), Flyway, Actuator health, Problem Details.
-5. OpenAPI contract `server/src/main/resources/openapi/kadr-api.yaml` with every MVP endpoint and schema. Server interfaces are generated from it; endpoints answer `501 Not Implemented` until their milestone.
+5. OpenAPI contract `app/src/main/resources/openapi/kadr-api.yaml` with every MVP endpoint and schema. Server interfaces are generated from it; endpoints answer `501 Not Implemented` until their milestone.
 6. README: how to build and run.
 
 Done when:
@@ -131,7 +130,7 @@ Tasks:
 1. Flyway `V1`: the whole schema — `library_root`, `photo`, `photo_file`, `enrichment`, `embedding`, `embedding_seq`.
 2. Domain entities and ports; `kadr-persistence-h2` repositories on `JdbcClient` with batched writes.
 3. `kadr-fs`:
-   - recursive walk that doesn't follow symlinks, skips hidden and service folders (`.*`, `@eaDir`, `#recycle`) and takes only `jpg`, `jpeg`, `png`, `webp`, case-insensitive;
+   - recursive walk that doesn't follow symlinks, skips hidden files and folders (`.*`) and service folders (`@eaDir`, `#recycle`, `$RECYCLE.BIN`, `System Volume Information`) and takes only `jpg`, `jpeg`, `png`, `webp`, case-insensitive;
    - identity hash: SHA-256 over the size, the first 64 KiB and the last 64 KiB; the whole file if it is 128 KiB or smaller.
 4. Use cases and REST:
    - `POST /api/libraries`: validation, `toRealPath()`, `409` if the path is already added; nested folders are allowed;
@@ -246,6 +245,7 @@ Done when: all criteria in §6 pass, or the owner accepts the deviations.
 | openapi-generator not ready for Spring Boot 4 | M0 | Hand-written interfaces validated against the contract in tests |
 | DJL tokenizers reaches the network: telemetry on tokenizer creation, native-library download on platforms not bundled in the jar | M1 | `ai.djl.offline=true`; verify an offline start |
 | Memory blow-up on large images | M1, M3 | Pixel limit checked from the header, subsampled decoding, bounded queues |
+| Folder progress is counted on every request, linear in the folder's files: about 4 µs per file, 0.35 s for 80 thousand files (measured in M2) | M3, M6 | If polling during indexing gets heavy: cache the counts for a few seconds, or keep counters per folder |
 
 ## 8. Working agreement
 
