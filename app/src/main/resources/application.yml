@@ -2,6 +2,16 @@ kadr:
   data-dir: ${user.home}/.kadr
   model:
     id: siglip2-base-patch16-224
+    dir: ${kadr.data-dir}/models/${kadr.model.id}
+  # Defaults measured on a 2-core, 4-thread laptop CPU; see docs/mvp-plan.md, M1
+  indexing:
+    enabled: true
+    decoding-threads: 2
+    inference-threads: 0  # one per physical core, taken as half the processors
+    batch-size: 16
+    max-attempts: 3
+    max-megapixels: 100
+    idle-pause: 5s
 
 spring:
   application:

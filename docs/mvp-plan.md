@@ -194,6 +194,17 @@ Tests: with a fake model — queue transitions, retries, failure isolation (brok
 
 Done when: acceptance criteria 1–3 pass; the status reaches `READY`.
 
+Notes from the work:
+
+- Ports: `EnrichmentQueue` (recover, claim, release, fail, counts) and `EmbeddingRepository` (vectors stored with their tasks done, in one transaction); `PhotoRepository.presentFiles` gives the files of a chunk of photos in one query. `core.indexing.Indexer` runs the work; `BackgroundIndexer` in the app runs it on a thread of its own from startup to shutdown.
+- The pipeline takes chunks of four batches; decoding threads hand the photos over through a queue of two batches; the indexer's own thread runs the model and does every write, failures included, so the decoding threads never touch the database. Nothing is interrupted: on stop the batch in the model is finished and the rest of the chunk released.
+- A photo that isn't an image (or is damaged, or too large) fails at once: its other files have the same content. One whose files can't be read is tried again after a minute, up to `max-attempts`. A failed photo stays failed until the processing version changes; a rescan doesn't retry it.
+- The vision tower loads at startup (0.6 GB), the text tower with the first text (M5). Without the model files the service doesn't start, and a failure analyzer says which are missing and where they go, instead of a stack trace.
+- `kadr.indexing.enabled=false` turns indexing off; the scan tests use it, so photos stay pending as scans leave them.
+- Tests: the queue's SQL in `persistence-h2`; the pipeline in `IndexingIT` with the real database and decoder and a fake model, the indexer in the test thread — criteria 1–3, a version bump, retries, reading a photo from another of its files; `RealModelIndexingIT` with the real model when its files are there; `KadrApplicationIT` checks a folder added through the API gets ready in the background.
+- The web interface refreshes the folder list every 5 s while a folder is indexing.
+- By hand, the built service on the owner's 114 photos: scanned in under a second, indexed in 98 s, about 1.2 photos/s, none failed; 1.8 GB of memory with `-Xmx768m`; a clean stop.
+
 ### M4. Vector index
 
 Tasks:

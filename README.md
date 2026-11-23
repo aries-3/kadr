@@ -7,7 +7,7 @@ A local photo catalog with semantic search: find photos by a text description or
 - Vector index — Apache Lucene (HNSW)
 - Embeddings — SigLIP 2 via ONNX Runtime, on CPU
 
-Status: early development, milestones M0–M2 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added and are scanned into the catalog; their photos can be browsed in the web interface. The embedding model runs and matches the reference implementation, but the service doesn't use it yet: indexing comes with M3, and the search endpoints answer `501 Not Implemented`.
+Status: early development, milestones M0–M3 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added; they are scanned into the catalog and their photos indexed in the background — turned into vectors by the embedding model — and can be browsed in the web interface. Search is not there yet: the search endpoints answer `501 Not Implemented`.
 
 ## Build
 
@@ -31,7 +31,7 @@ curl -L -o $M/tokenizer.json $R/tokenizer.json
 curl -L -o $M/preprocessor_config.json $R/preprocessor_config.json
 ```
 
-Loaded, the model takes about 2 GB of memory. The build tests it when the files are there and that much memory is free, and skips those tests otherwise; `-Dkadr.model.dir=/path` points them to another folder.
+The service doesn't start without them, and says which are missing. It loads the image part of the model at startup, about 0.6 GB of memory; the text part, 1.3 GB more, only with the first text query. The build tests the model when the files are there and 2.5 GB of memory is free, and skips those tests otherwise; `-Dkadr.model.dir=/path` points them to another folder.
 
 Two measurements run on photos of your own, which stay outside the repository:
 
@@ -48,7 +48,7 @@ Two measurements run on photos of your own, which stay outside the repository:
 ## Run
 
 ```bash
-java -jar app/target/kadr.jar
+java -Xmx768m -jar app/target/kadr.jar
 ```
 
 The service listens on `http://127.0.0.1:8080` and keeps its data in `~/.kadr`. Both can be changed:
@@ -58,6 +58,17 @@ java -jar app/target/kadr.jar --kadr.data-dir=/path/to/data --server.port=8081
 ```
 
 Open http://127.0.0.1:8080/ for the web interface.
+
+Photos are indexed in the background, a few batches at a time; the log reports the progress about once a minute, with the time left. While indexing, the service takes about 1.8 GB of memory with `-Xmx768m`, which is enough for it: by default Java may take a quarter of the memory for its heap alone. On a laptop CPU it takes about 0.6 s a photo: 100,000 photos take most of a day, once — later scans index only new photos. A stopped service goes on where it stopped. The settings, under `kadr.indexing` (see `application.yml`):
+
+| Setting | Default | |
+|---|---|---|
+| `enabled` | `true` | `false` stops indexing; scanning goes on |
+| `inference-threads` | `0` | threads of the model; `0` is one per physical core, taken as half the processors |
+| `decoding-threads` | `2` | threads decoding photos alongside the model |
+| `batch-size` | `16` | photos the model takes at once |
+| `max-attempts` | `3` | attempts at a photo whose file can't be read; one that isn't an image fails at once |
+| `max-megapixels` | `100` | larger images aren't decoded and fail |
 
 Health check:
 

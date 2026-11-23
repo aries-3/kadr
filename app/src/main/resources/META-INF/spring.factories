@@ -1,2 +1,5 @@
 org.springframework.context.ApplicationContextInitializer=\
 com.teacode.kazakov.kadr.app.config.DataDirectoryInitializer
+
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.teacode.kazakov.kadr.app.config.ModelFilesMissingFailureAnalyzer

@@ -18,6 +18,7 @@ import com.teacode.kazakov.kadr.domain.catalog.LibraryProgress;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryStatus;
 import com.teacode.kazakov.kadr.domain.catalog.PathRange;
 import com.teacode.kazakov.kadr.domain.catalog.ScanOutcome;
+import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
 import com.teacode.kazakov.kadr.domain.files.ContentHasher;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,6 +36,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -51,6 +53,8 @@ class LibraryScanIT {
     @DynamicPropertySource
     static void dataDir(DynamicPropertyRegistry registry) {
         registry.add("kadr.data-dir", dataDir::toString);
+        // Photos stay pending, so the scans can be checked as they leave them
+        registry.add("kadr.indexing.enabled", () -> "false");
     }
 
     @MockitoBean
@@ -59,6 +63,10 @@ class LibraryScanIT {
     /** Shows which files a scan reads. */
     @MockitoSpyBean
     ContentHasher hasher;
+
+    /** The real model isn't loaded: see {@link com.teacode.kazakov.kadr.app.FakeEmbeddingModel}. */
+    @TestBean(methodName = "com.teacode.kazakov.kadr.app.FakeEmbeddingModel#create")
+    EmbeddingModel model;
 
     @Autowired
     LibraryService libraries;

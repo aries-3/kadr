@@ -27,8 +27,8 @@ import org.springframework.transaction.support.TransactionOperations;
 class CatalogConfiguration {
 
     /**
-     * Version of the embedding processing: bumping it re-indexes every photo. Moves to the model
-     * adapter once it exists (milestone M1).
+     * Version of the embedding processing: bumping it indexes every photo again. Bump it when the
+     * vectors change: the model files, decoding, preparing images for the model.
      */
     static final int EMBEDDING_VERSION = 1;
 

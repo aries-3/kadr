@@ -13,6 +13,7 @@ import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
@@ -159,6 +160,20 @@ class JdbcPhotoRepositoryTest {
     @Test
     void unknownPhotoIsNotFound() {
         assertThat(photos.findPhoto(999)).isEmpty();
+    }
+
+    @Test
+    void findsThePresentFilesOfSeveralPhotos() {
+        record(file("/photos/b.jpg", 1), file("/photos/a.jpg", 1), file("/photos/c.jpg", 2), file("/photos/d.jpg", 3));
+        photos.markMissing(List.of(fileId("/photos/d.jpg")));
+        long first = photoOf("/photos/a.jpg");
+        long second = photoOf("/photos/c.jpg");
+        long gone = photoOf("/photos/d.jpg");
+
+        assertThat(photos.presentFiles(List.of(first, second, gone, 999L))).isEqualTo(Map.of(
+                first, List.of(Path.of("/photos/a.jpg"), Path.of("/photos/b.jpg")),
+                second, List.of(Path.of("/photos/c.jpg"))));
+        assertThat(photos.presentFiles(List.of())).isEmpty();
     }
 
     @Test

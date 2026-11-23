@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.jayway.jsonpath.JsonPath;
+import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -44,6 +46,10 @@ class PhotosApiIT {
     static void dataDir(DynamicPropertyRegistry registry) {
         registry.add("kadr.data-dir", dataDir::toString);
     }
+
+    /** The real model isn't loaded: see {@link com.teacode.kazakov.kadr.app.FakeEmbeddingModel}. */
+    @TestBean(methodName = "com.teacode.kazakov.kadr.app.FakeEmbeddingModel#create")
+    EmbeddingModel model;
 
     @Autowired
     MockMvcTester mvc;

@@ -3,8 +3,9 @@ import Alpine from "alpinejs";
 import { addLibrary, listLibraries, rescanLibrary, type Library } from "./api";
 import { count, dateTime, errorMessage, statusLabel } from "./format";
 
-/** How often the list is refreshed while a folder is being scanned. */
-const REFRESH_INTERVAL_MS = 2000;
+/** How often the list is refreshed while a folder is being scanned, and while photos are being indexed. */
+const SCANNING_REFRESH_MS = 2000;
+const INDEXING_REFRESH_MS = 5000;
 
 Alpine.data("libraries", () => ({
     libraries: [] as Library[],
@@ -28,8 +29,12 @@ Alpine.data("libraries", () => ({
         } catch (error) {
             this.error = errorMessage(error);
         }
-        if (this.libraries.some((library) => library.status === "SCANNING")) {
-            this.refreshTimer = window.setTimeout(() => this.refresh(), REFRESH_INTERVAL_MS);
+        const statuses = new Set(this.libraries.map((library) => library.status));
+        const interval = statuses.has("SCANNING") ? SCANNING_REFRESH_MS
+            : statuses.has("INDEXING") ? INDEXING_REFRESH_MS
+            : 0;
+        if (interval > 0) {
+            this.refreshTimer = window.setTimeout(() => this.refresh(), interval);
         }
     },
 

@@ -181,6 +181,25 @@ public final class JdbcPhotoRepository implements PhotoRepository {
     }
 
     @Override
+    public Map<Long, List<Path>> presentFiles(Collection<Long> photoIds) {
+        Map<Long, List<Path>> files = new HashMap<>();
+        if (photoIds.isEmpty()) {
+            return files;
+        }
+        jdbc.sql("""
+                        SELECT photo_id, path FROM photo_file
+                        WHERE photo_id IN (:ids) AND NOT missing
+                        ORDER BY photo_id, path
+                        """)
+                .param("ids", photoIds)
+                .query(rs -> {
+                    files.computeIfAbsent(rs.getLong("photo_id"), id -> new ArrayList<>())
+                            .add(Path.of(rs.getString("path")));
+                });
+        return files;
+    }
+
+    @Override
     public PhotoPage photos(PathRange range, long offset, int limit) {
         long total = jdbc.sql("""
                         SELECT COUNT(DISTINCT photo_id) FROM photo_file

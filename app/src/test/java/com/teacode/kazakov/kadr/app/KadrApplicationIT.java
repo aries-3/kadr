@@ -1,9 +1,15 @@
 package com.teacode.kazakov.kadr.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
+import com.jayway.jsonpath.JsonPath;
+import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
+import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +19,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -27,6 +35,10 @@ class KadrApplicationIT {
         // A directory that doesn't exist yet: the service must create it
         registry.add("kadr.data-dir", () -> tempDir.resolve("data").toString());
     }
+
+    /** The real model isn't loaded: see {@link FakeEmbeddingModel}. */
+    @TestBean(methodName = "com.teacode.kazakov.kadr.app.FakeEmbeddingModel#create")
+    EmbeddingModel model;
 
     @Autowired
     MockMvcTester mvc;
@@ -62,6 +74,21 @@ class KadrApplicationIT {
                 .bodyText().contains("<header class=\"top\">", script));
         assertThat(mvc.get().uri("/js/libraries.js")).hasStatusOk();
         assertThat(mvc.get().uri("/kadr.css")).hasStatusOk();
+    }
+
+    /** The indexing runs in the background: a folder added gets ready by itself. */
+    @Test
+    void indexesFoldersInTheBackground(@TempDir Path photos) throws Exception {
+        BufferedImage image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, 0x123456);
+        ImageIO.write(image, "png", photos.resolve("a.png").toFile());
+        MvcTestResult added = mvc.post().uri("/api/libraries").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"path\": \"%s\"}".formatted(photos.toRealPath())).exchange();
+        long id = JsonPath.<Number>read(added.getResponse().getContentAsString(), "$.id").longValue();
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(mvc.get().uri("/api/libraries/{id}", id)).bodyJson()
+                        .isLenientlyEqualTo("{\"status\": \"READY\", \"files\": 1, \"indexed\": 1}"));
     }
 
     @Test

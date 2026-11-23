@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,6 +29,9 @@ import org.jspecify.annotations.Nullable;
  * Images are prepared as the Hugging Face image processor does, texts as SigLIP 2 was trained;
  * a mistake there gives no error, just worse vectors, so the results were checked against the
  * reference implementation in Python.
+ * <p>
+ * The text tower is loaded with the first text, not with the model: indexing needs only the
+ * vision tower, and the text one takes twice its memory.
  */
 public final class SiglipModel implements EmbeddingModel, AutoCloseable {
 
@@ -37,79 +39,62 @@ public final class SiglipModel implements EmbeddingModel, AutoCloseable {
     private static final String TEXT_INPUT = "input_ids";
 
     private final String id;
+    private final SiglipModelFiles files;
     private final ImagePreprocessor preprocessor;
-    private final TextTokenizer tokenizer;
     private final OrtEnvironment environment;
     private final OrtSession.SessionOptions options;
     private final OrtSession vision;
-    private final OrtSession text;
     private final String visionInput;
     private final int dimension;
+    /** Loaded with the first text. */
+    private volatile @Nullable TextTower text;
 
-    private SiglipModel(String id, ImagePreprocessor preprocessor, TextTokenizer tokenizer,
-            OrtSession.SessionOptions options, OrtSession vision, OrtSession text) throws OrtException {
+    private SiglipModel(String id, SiglipModelFiles files, ImagePreprocessor preprocessor,
+            OrtSession.SessionOptions options, OrtSession vision) throws OrtException {
         this.id = id;
+        this.files = files;
         this.preprocessor = preprocessor;
-        this.tokenizer = tokenizer;
         this.environment = OrtEnvironment.getEnvironment();
         this.options = options;
         this.vision = vision;
-        this.text = text;
         this.visionInput = checkVisionInput(vision, preprocessor.size());
-        checkTextInput(text);
         this.dimension = outputDimension(vision, "vision");
-        int textDimension = outputDimension(text, "text");
-        if (textDimension != dimension) {
-            throw new IllegalStateException("The vision model makes vectors of %d values, the text model of %d"
-                    .formatted(dimension, textDimension));
-        }
     }
 
     /**
-     * Loads a model: reads its settings and tokenizer, starts an ONNX Runtime session for each
-     * tower and checks their inputs and outputs. Takes a few seconds and about 1.5 times the size
-     * of the model files in memory, for a moment more: 2 GB for the base model, 2.6 GB at the peak.
+     * Loads a model: checks that all its files are there, reads its settings, starts an ONNX
+     * Runtime session for the vision tower and checks its input and output. Takes a few seconds
+     * and 0.6 GB of memory for the base model; the first text loads the text tower, 1.3 GB more,
+     * 1.9 GB for a moment.
      *
      * @param id      the identifier of the model, e.g. {@code siglip2-base-patch16-224}
      * @param files   its files
      * @param threads how many threads one inference may use
      * @return the model
-     * @throws IllegalStateException if a file is missing or can't be loaded, or the model isn't a
-     *                               SigLIP one this class can run
+     * @throws ModelFilesMissingException if a file isn't there
+     * @throws IllegalStateException       if a file can't be loaded, or the model isn't a SigLIP one
+     *                                     this class can run
      */
     public static SiglipModel load(String id, SiglipModelFiles files, int threads) {
         List<Path> missing = files.missing();
         if (!missing.isEmpty()) {
-            throw new IllegalStateException(("The files of the model %s are missing: %s. "
-                    + "Put them there; the README says where to get them")
-                    .formatted(id, missing.stream().map(Path::toString).collect(Collectors.joining(", "))));
+            throw new ModelFilesMissingException(id, missing);
         }
         ImagePreprocessor preprocessor = ImagePreprocessor.read(files.preprocessorConfig());
-        List<AutoCloseable> opened = new ArrayList<>();
+        OrtSession.SessionOptions options = new OrtSession.SessionOptions();
         try {
-            TextTokenizer tokenizer = TextTokenizer.open(files.tokenizer());
-            opened.add(tokenizer);
-            OrtSession.SessionOptions options = new OrtSession.SessionOptions();
-            opened.add(options);
             options.setIntraOpNumThreads(threads);
             options.setInterOpNumThreads(1);
             options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
-            OrtEnvironment environment = OrtEnvironment.getEnvironment();
-            // The text tower first: loading takes about twice its file size for a moment (2 GB
-            // for the base model), so it's better done before the vision tower takes its share
-            OrtSession text = environment.createSession(files.textModel().toString(), options);
-            opened.add(text);
-            OrtSession vision = environment.createSession(files.visionModel().toString(), options);
-            opened.add(vision);
-            return new SiglipModel(id, preprocessor, tokenizer, options, vision, text);
-        } catch (IOException | OrtException | RuntimeException e) {
-            for (AutoCloseable resource : opened.reversed()) {
-                try {
-                    resource.close();
-                } catch (Exception closing) {
-                    e.addSuppressed(closing);
-                }
+            OrtSession vision = OrtEnvironment.getEnvironment().createSession(files.visionModel().toString(), options);
+            try {
+                return new SiglipModel(id, files, preprocessor, options, vision);
+            } catch (OrtException | RuntimeException e) {
+                close(vision, e);
+                throw e;
             }
+        } catch (OrtException | RuntimeException e) {
+            options.close();
             if (e instanceof IllegalStateException state) {
                 throw state;
             }
@@ -158,12 +143,57 @@ public final class SiglipModel implements EmbeddingModel, AutoCloseable {
         if (texts.isEmpty()) {
             return List.of();
         }
-        LongBuffer input = LongBuffer.wrap(tokenizer.ids(texts));
+        TextTower tower = text();
+        LongBuffer input = LongBuffer.wrap(tower.tokenizer().ids(texts));
         try {
-            return run(text, TEXT_INPUT,
+            return run(tower.session(), TEXT_INPUT,
                     OnnxTensor.createTensor(environment, input, new long[] {texts.size(), TextTokenizer.LENGTH}));
         } catch (OrtException e) {
             throw new IllegalStateException("Can't embed texts: " + e.getMessage(), e);
+        }
+    }
+
+    private TextTower text() {
+        TextTower loaded = text;
+        if (loaded == null) {
+            synchronized (this) {
+                loaded = text;
+                if (loaded == null) {
+                    loaded = loadText();
+                    text = loaded;
+                }
+            }
+        }
+        return loaded;
+    }
+
+    private TextTower loadText() {
+        TextTokenizer tokenizer;
+        try {
+            tokenizer = TextTokenizer.open(files.tokenizer());
+        } catch (IOException | RuntimeException e) {
+            throw new IllegalStateException("Can't load the tokenizer of the model %s: %s".formatted(id, e.getMessage()), e);
+        }
+        try {
+            OrtSession session = environment.createSession(files.textModel().toString(), options);
+            try {
+                checkTextInput(session);
+                int textDimension = outputDimension(session, "text");
+                if (textDimension != dimension) {
+                    throw new IllegalStateException("The vision model makes vectors of %d values, the text model of %d"
+                            .formatted(dimension, textDimension));
+                }
+                return new TextTower(tokenizer, session);
+            } catch (OrtException | RuntimeException e) {
+                close(session, e);
+                throw e;
+            }
+        } catch (OrtException | RuntimeException e) {
+            tokenizer.close();
+            if (e instanceof IllegalStateException state) {
+                throw state;
+            }
+            throw new IllegalStateException("Can't load the text model of %s: %s".formatted(id, e.getMessage()), e);
         }
     }
 
@@ -257,14 +287,32 @@ public final class SiglipModel implements EmbeddingModel, AutoCloseable {
 
     @Override
     public void close() {
+        TextTower loaded = text;
         try {
-            text.close();
+            if (loaded != null) {
+                loaded.session().close();
+                loaded.tokenizer().close();
+            }
             vision.close();
         } catch (OrtException e) {
             throw new IllegalStateException("Can't close the model: " + e.getMessage(), e);
         } finally {
             options.close();
-            tokenizer.close();
         }
+    }
+
+    private static void close(OrtSession session, Exception failure) {
+        try {
+            session.close();
+        } catch (OrtException closing) {
+            failure.addSuppressed(closing);
+        }
+    }
+
+    /**
+     * @param tokenizer turns texts into tokens
+     * @param session   the text tower
+     */
+    private record TextTower(TextTokenizer tokenizer, OrtSession session) {
     }
 }

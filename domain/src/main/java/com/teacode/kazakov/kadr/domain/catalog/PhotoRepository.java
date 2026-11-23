@@ -1,9 +1,11 @@
 package com.teacode.kazakov.kadr.domain.catalog;
 
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -61,6 +63,15 @@ public interface PhotoRepository {
      * @return the photo, or empty if there is no such photo
      */
     Optional<Photo> findPhoto(long photoId);
+
+    /**
+     * Finds the present files of photos.
+     *
+     * @param photoIds catalog ids of the photos
+     * @return the files of each photo that has any, in the order of their paths; a photo without
+     *         present files, or unknown, isn't in the map
+     */
+    Map<Long, List<Path>> presentFiles(Collection<Long> photoIds);
 
     /**
      * Lists the photos with a present file inside a folder, ordered by the path of the first such
