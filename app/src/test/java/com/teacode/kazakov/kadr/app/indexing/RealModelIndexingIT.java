@@ -2,8 +2,8 @@ package com.teacode.kazakov.kadr.app.indexing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.teacode.kazakov.kadr.app.RealModel;
 import com.teacode.kazakov.kadr.core.catalog.LibraryScanner;
 import com.teacode.kazakov.kadr.core.catalog.LibraryService;
 import com.teacode.kazakov.kadr.core.catalog.ScanLauncher;
@@ -12,7 +12,6 @@ import com.teacode.kazakov.kadr.domain.catalog.LibraryProgress;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryStatus;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
 import com.teacode.kazakov.kadr.domain.images.ImageDecoder;
-import com.teacode.kazakov.kadr.onnx.SiglipModelFiles;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -31,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -42,11 +42,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * without them, or without memory enough for the vision tower; the text tower isn't loaded.
  */
 @SpringBootTest
+// Closed after the class: the model takes gigabytes
+@DirtiesContext
 class RealModelIndexingIT {
 
-    private static final Path MODEL = Path.of(System.getProperty("kadr.model.dir",
-            Path.of(System.getProperty("user.home"), ".kadr", "models", "siglip2-base-patch16-224").toString()));
-    private static final long MEMORY_NEEDED = 3L << 29;
     private static final Duration TIMEOUT = Duration.ofMinutes(1);
 
     @TempDir
@@ -54,21 +53,14 @@ class RealModelIndexingIT {
 
     @BeforeAll
     static void modelIsThere() throws IOException {
-        assumeTrue(SiglipModelFiles.in(MODEL).missing().isEmpty(), () -> "The model files aren't in " + MODEL
-                + "; set kadr.model.dir to their folder to run this test");
-        long available = Files.readAllLines(Path.of("/proc/meminfo")).stream()
-                .filter(line -> line.startsWith("MemAvailable:"))
-                .mapToLong(line -> Long.parseLong(line.replaceAll("\\D", "")) * 1024)
-                .findFirst()
-                .orElse(Long.MAX_VALUE);
-        assumeTrue(available >= MEMORY_NEEDED, () -> "Loading the model takes %d MB of memory, %d MB is free"
-                .formatted(MEMORY_NEEDED >> 20, available >> 20));
+        // The vision tower only
+        RealModel.assumeAvailable(1536);
     }
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("kadr.data-dir", dataDir::toString);
-        registry.add("kadr.model.dir", MODEL::toString);
+        registry.add("kadr.model.dir", RealModel.FOLDER::toString);
         // The test runs the indexer itself
         registry.add("kadr.indexing.enabled", () -> "false");
         registry.add("kadr.indexing.idle-pause", () -> "50ms");
@@ -112,7 +104,7 @@ class RealModelIndexingIT {
         assertThat(libraries.get(id).progress()).isEqualTo(new LibraryProgress(4, 3, 0, 1));
         for (Path image : images) {
             float[] stored = stored(image.toRealPath());
-            float[] expected = model.embedImages(List.of(decoder.decode(image, 4 * model.imageSize()))).getFirst();
+            float[] expected = model.embedImages(List.of(decoder.decode(image, model.minDecodedSide()))).getFirst();
             assertThat(stored).as(image.getFileName().toString()).hasSize(768);
             double similarity = 0;
             for (int i = 0; i < stored.length; i++) {

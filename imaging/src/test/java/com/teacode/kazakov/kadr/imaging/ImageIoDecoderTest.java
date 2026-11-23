@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.within;
 
 import com.teacode.kazakov.kadr.domain.images.RgbImage;
 import com.teacode.kazakov.kadr.domain.images.UndecodableImageException;
+import com.teacode.kazakov.kadr.domain.images.UnsupportedImageFormatException;
 import java.awt.Transparency;
 import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
@@ -21,8 +22,10 @@ import java.awt.image.IndexColorModel;
 import java.awt.image.WritableRaster;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Objects;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -204,6 +207,53 @@ class ImageIoDecoderTest {
     @Test
     void missingFileCantBeOpened() {
         assertThatIOException().isThrownBy(() -> decoder.decode(folder.resolve("absent.jpg"), WHOLE));
+    }
+
+    @Test
+    void decodesAnImageInMemoryUprightAsAFile() throws Exception {
+        byte[] jpeg = withOrientation(jpeg(quadrants(400, 200)), 6);
+
+        RgbImage decoded = decoder.decode(jpeg, WHOLE);
+
+        assertThat(decoded.width()).isEqualTo(200);
+        assertThat(decoded.height()).isEqualTo(400);
+        assertThat(colorAt(decoded, 10, 10)).isEqualTo("blue");
+        assertThat(decoded.pixels()).isEqualTo(decoder.decode(Files.write(folder.resolve("a.jpg"), jpeg), WHOLE).pixels());
+    }
+
+    @Test
+    void anImageInMemoryIsReducedAsAFile() throws Exception {
+        Path file = write("a.png", quadrants(1000, 300));
+
+        assertThat(decoder.decode(Files.readAllBytes(file), 100).width()).isEqualTo(334);
+    }
+
+    @Test
+    void contentOfAnotherFormatIsNotSupported() {
+        assertThatExceptionOfType(UnsupportedImageFormatException.class)
+                .isThrownBy(() -> decoder.decode("not an image".getBytes(StandardCharsets.UTF_8), WHOLE))
+                .withMessage("Not a JPEG, PNG or WebP image");
+        assertThatExceptionOfType(UnsupportedImageFormatException.class)
+                .isThrownBy(() -> decoder.decode(new byte[0], WHOLE));
+    }
+
+    @Test
+    void aDamagedImageInMemoryIsNotDecoded() throws IOException {
+        byte[] damaged = Arrays.copyOf(jpeg(quadrants(100, 50)), 200);
+
+        assertThatExceptionOfType(UndecodableImageException.class)
+                .isThrownBy(() -> decoder.decode(damaged, WHOLE))
+                .isNotInstanceOf(UnsupportedImageFormatException.class)
+                .withMessage("The image can't be decoded");
+    }
+
+    @Test
+    void aTooLargeImageInMemoryIsNotDecoded() throws IOException {
+        byte[] png = Files.readAllBytes(write("a.png", quadrants(20, 20)));
+
+        assertThatExceptionOfType(UndecodableImageException.class)
+                .isThrownBy(() -> new ImageIoDecoder(399).decode(png, WHOLE))
+                .withMessage("The image is too large, 20 × 20 pixels");
     }
 
     @Test

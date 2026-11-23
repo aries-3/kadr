@@ -60,14 +60,6 @@ class KadrApplicationIT {
     }
 
     @Test
-    void apiEndpointsAnswerNotImplementedUntilTheirMilestone() {
-        assertThat(mvc.post().uri("/api/search/text")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"query\": \"a dog\"}"))
-                .hasStatus(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-    @Test
     void servesTheWebInterface() {
         assertThat(mvc.get().uri("/")).hasForwardedUrl("index.html");
         // Pages built from the templates, each with the shared header and its own script

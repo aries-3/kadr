@@ -21,11 +21,9 @@ final class TestModel {
     static final String ID = "siglip2-base-patch16-224";
 
     /**
-     * Photos are decoded keeping the shorter side at least this many times the model's input size.
-     * Reading every n-th pixel of a large photo keeps less detail than scaling it down whole:
-     * measured on 32 photos against decoding them whole, the vectors stay at a similarity of 0.992
-     * on average, 0.972 at worst, keeping twice the size; 0.9994 and 0.998 keeping four times, for
-     * 20 ms more decoding a photo.
+     * Photos are decoded keeping the shorter side at least this many times the model's input, as
+     * {@link com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel#minDecodedSide()} says: for
+     * the measurements that pick their sizes before the model is loaded.
      */
     static final int DECODING_FACTOR = 4;
 

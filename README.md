@@ -7,7 +7,7 @@ A local photo catalog with semantic search: find photos by a text description or
 - Vector index — Apache Lucene (HNSW)
 - Embeddings — SigLIP 2 via ONNX Runtime, on CPU
 
-Status: early development, milestones M0–M4 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added; they are scanned into the catalog and their photos indexed in the background — turned into vectors by the embedding model and put into a vector index — and can be browsed in the web interface. Search is not there yet: the search endpoints answer `501 Not Implemented`.
+Status: early development, milestones M0–M5 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added; they are scanned into the catalog and their photos indexed in the background — turned into vectors by the embedding model and put into a vector index. Photos are found by a text, in Russian, English or another language, or by an image like them, through the API or the web interface, where they can be browsed too. What is left is the acceptance on the owner's photos.
 
 ## Build
 
@@ -106,6 +106,17 @@ curl -O -J http://127.0.0.1:8080/api/photos/42/file
 ```
 
 Thumbnails are made on the first request and kept in `~/.kadr/thumbnails`; they can be deleted at any time.
+
+Find photos by what is in them, in any language, or by an image like them; the most similar first, up to `limit`, 20 by default and 200 at most:
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/search/text \
+     -H 'Content-Type: application/json' \
+     -d '{"query": "собака на пляже на закате", "limit": 10}'
+curl -F image=@photo.jpg -F limit=10 http://127.0.0.1:8080/api/search/image
+```
+
+Each photo comes with its files and a `score`, the cosine similarity to the query: only the order means something, a photo that fits a text scores about 0.1–0.2. Russian works, a little worse than English. An uploaded image is used for that search only and isn't kept; it may be up to 30 MB. The first text search takes a few seconds more: it loads the text part of the model, which takes the service to about 2.6 GB of memory.
 
 A scan takes JPEG, PNG and WebP files. It skips hidden folders and files, NAS and Windows service folders (`@eaDir`, `#recycle`, `$RECYCLE.BIN`, `System Volume Information`), and doesn't follow symbolic links. Files are only read, never changed. A rescan reads only new and changed files; moved and copied files keep what was computed for them.
 

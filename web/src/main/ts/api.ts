@@ -81,9 +81,6 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
 
 /** What went wrong, from the Problem Details of the answer. */
 async function problem(response: Response): Promise<string> {
-    if (response.status === 501) {
-        return "Not implemented yet";
-    }
     try {
         const problem = (await response.json()) as Schemas["ProblemDetail"];
         return problem.detail ?? problem.title ?? `Error ${response.status}`;

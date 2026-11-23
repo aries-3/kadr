@@ -20,6 +20,11 @@ spring:
     # Spring closes the database on shutdown; H2's own shutdown hook would close it
     # before background work has stopped
     url: jdbc:h2:file:${kadr.data-dir}/catalog;DB_CLOSE_ON_EXIT=FALSE
+  servlet:
+    multipart:
+      # An image to search by; larger uploads are answered 413
+      max-file-size: 30MB
+      max-request-size: 31MB
   mvc:
     problemdetails:
       enabled: true

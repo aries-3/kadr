@@ -53,15 +53,6 @@ public final class Indexer {
 
     private static final Logger log = LoggerFactory.getLogger(Indexer.class);
 
-    /**
-     * Photos are decoded keeping the shorter side at least this many times the model's input.
-     * Decoding a large photo reads every n-th pixel, which keeps less detail than scaling it down
-     * whole: measured on real photos, the vectors stay at a similarity of 0.992 on average and
-     * 0.972 at worst to those of the whole photo keeping twice the input; 0.9994 and 0.998
-     * keeping four times, for 20 ms more decoding a photo.
-     */
-    static final int DECODING_FACTOR = 4;
-
     /** How long a task that failed waits before another attempt. */
     static final Duration RETRY_DELAY = Duration.ofMinutes(1);
 
@@ -180,7 +171,7 @@ public final class Indexer {
      */
     private void process(List<Long> chunk, ExecutorService decoding, BooleanSupplier stopRequested, Progress progress) {
         Map<Long, List<Path>> files = photos.presentFiles(chunk);
-        int minSide = DECODING_FACTOR * model.imageSize();
+        int minSide = model.minDecodedSide();
         BlockingQueue<Decoded> decoded = new ArrayBlockingQueue<>(2 * settings.batchSize());
         // Once set, the decoding threads pass over what is left, so the chunk drains quickly
         AtomicBoolean abandoned = new AtomicBoolean();

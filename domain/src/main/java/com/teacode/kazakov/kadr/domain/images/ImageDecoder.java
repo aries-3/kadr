@@ -21,4 +21,15 @@ public interface ImageDecoder {
      *                                   too many pixels
      */
     RgbImage decode(Path file, int minSide) throws IOException, UndecodableImageException;
+
+    /**
+     * Decodes an image held in memory, e.g. an upload, the same way as a file.
+     *
+     * @param image   the content of a JPEG, PNG or WebP file
+     * @param minSide the shortest side worth keeping, in pixels
+     * @return the pixels
+     * @throws UnsupportedImageFormatException if the content isn't of a supported format
+     * @throws UndecodableImageException       if the image is damaged or has too many pixels
+     */
+    RgbImage decode(byte[] image, int minSide) throws UndecodableImageException;
 }

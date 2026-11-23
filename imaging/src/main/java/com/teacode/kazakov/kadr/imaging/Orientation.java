@@ -7,6 +7,7 @@ import com.drew.metadata.MetadataException;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.teacode.kazakov.kadr.domain.images.RgbImage;
 import java.awt.geom.AffineTransform;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -41,16 +42,37 @@ enum Orientation {
      */
     static Orientation of(Path file) {
         try {
-            Metadata metadata = ImageMetadataReader.readMetadata(file.toFile());
-            ExifIFD0Directory exif = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+            return of(ImageMetadataReader.readMetadata(file.toFile()));
+        } catch (ImageProcessingException | IOException e) {
+            // Without readable metadata the image is shown as stored
+            return NORMAL;
+        }
+    }
+
+    /**
+     * Reads the orientation of an image held in memory.
+     *
+     * @return the orientation; {@link #NORMAL} if the image has none or it can't be read
+     */
+    static Orientation of(byte[] image) {
+        try {
+            return of(ImageMetadataReader.readMetadata(new ByteArrayInputStream(image), image.length));
+        } catch (ImageProcessingException | IOException e) {
+            return NORMAL;
+        }
+    }
+
+    private static Orientation of(Metadata metadata) {
+        ExifIFD0Directory exif = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+        try {
             if (exif != null && exif.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
                 int value = exif.getInt(ExifIFD0Directory.TAG_ORIENTATION);
                 if (value >= 1 && value <= values().length) {
                     return values()[value - 1];
                 }
             }
-        } catch (ImageProcessingException | MetadataException | IOException e) {
-            // Without readable metadata the image is shown as stored
+        } catch (MetadataException e) {
+            // A tag that isn't a number: shown as stored
         }
         return NORMAL;
     }

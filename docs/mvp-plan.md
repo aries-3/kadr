@@ -248,6 +248,14 @@ Tests: API and error codes with a fake model and index; an end-to-end IT with th
 
 Done when: acceptance criteria 7 and 8 pass; the README has `curl` examples.
 
+Notes from the work:
+
+- `core.search.SearchService`: the query vector, the index asked for `max(2 × limit, 100)`, the files of the hits from H2 in one query, photos without a present file left out, the index asked again for four times as many, up to 10,000, when too few are left.
+- Images to search by are decoded from memory as photos are for indexing: the same decoder, the same size, `EmbeddingModel.minDecodedSide()` (4 × the input, moved there from the indexer for both to use). Not a JPEG, PNG or WebP → 415; damaged or too many pixels → 400; over 30 MB → 413, checked on a real server, as the MVC test client doesn't parse uploads.
+- Tests: `SearchServiceTest` (leaving out, asking again, errors), `SearchApiIT` with the fake model (the answer, an image finding itself, a photo whose files are gone, the errors of criterion 8), `UploadLimitIT` (413), `RealModelSearchIT` with the real model: texts in English and Russian find the photo they describe; a photo of the catalog finds itself first with a score over 0.99 — the first part of criterion 7; the second, another shot of the same scene, needs real photos and is left to M6.
+- The tests of the real model ran at last with the lazily loaded text tower: the reference check matches as before.
+- By hand, the built service on the owner's 114 photos: the same results as the quality check of M1; a text search takes 220–290 ms once the text tower is loaded, the first one 6.4 s; a search by a 3.4 MB photo 1.2 s. With both towers the service takes 2.6 GB of memory, 3.2 GB at the peak.
+
 ### M6. Acceptance
 
 Tasks:

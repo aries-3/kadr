@@ -46,7 +46,7 @@ class EmbeddingQualityIT {
         List<float[]> vectors = new ArrayList<>();
         List<RgbImage> batch = new ArrayList<>();
         for (Path photo : found) {
-            List<RgbImage> image = RealPhotos.decode(decoder, photo, TestModel.DECODING_FACTOR * model.imageSize());
+            List<RgbImage> image = RealPhotos.decode(decoder, photo, model.minDecodedSide());
             if (!image.isEmpty()) {
                 photos.add(photo);
                 batch.addAll(image);

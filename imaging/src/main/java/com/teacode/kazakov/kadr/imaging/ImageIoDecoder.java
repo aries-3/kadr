@@ -32,11 +32,20 @@ public final class ImageIoDecoder implements ImageDecoder {
 
     @Override
     public RgbImage decode(Path file, int minSide) throws IOException, UndecodableImageException {
+        BufferedImage image = ImageReading.read(file, maxPixels, keeping(minSide));
+        return Orientation.of(file).upright(RgbPixels.of(image));
+    }
+
+    @Override
+    public RgbImage decode(byte[] image, int minSide) throws UndecodableImageException {
+        BufferedImage decoded = ImageReading.read(image, maxPixels, keeping(minSide));
+        return Orientation.of(image).upright(RgbPixels.of(decoded));
+    }
+
+    private static ImageReading.Subsampling keeping(int minSide) {
         if (minSide < 1) {
             throw new IllegalArgumentException("The shortest side to keep is " + minSide);
         }
-        BufferedImage image = ImageReading.read(file, maxPixels, (width, height) ->
-                Math.max(1, Math.min(width, height) / minSide));
-        return Orientation.of(file).upright(RgbPixels.of(image));
+        return (width, height) -> Math.max(1, Math.min(width, height) / minSide);
     }
 }

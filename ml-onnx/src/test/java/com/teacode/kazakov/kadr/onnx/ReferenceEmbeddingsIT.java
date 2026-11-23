@@ -48,7 +48,7 @@ class ReferenceEmbeddingsIT {
     @MethodSource("images")
     void imageVectorsMatchTheReference(Reference.ImageReference reference) throws Exception {
         ImageIoDecoder decoder = new ImageIoDecoder(ImageIoDecoder.DEFAULT_MAX_PIXELS);
-        RgbImage image = decoder.decode(reference.path(), TestModel.DECODING_FACTOR * model.imageSize());
+        RgbImage image = decoder.decode(reference.path(), model.minDecodedSide());
 
         double similarity = similarity(model.embedImages(List.of(image)).getFirst(), reference.embedding());
 

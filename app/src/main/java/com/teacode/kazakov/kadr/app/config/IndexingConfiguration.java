@@ -2,6 +2,7 @@ package com.teacode.kazakov.kadr.app.config;
 
 import com.teacode.kazakov.kadr.core.indexing.Indexer;
 import com.teacode.kazakov.kadr.core.indexing.VectorIndexUpdater;
+import com.teacode.kazakov.kadr.core.search.SearchService;
 import com.teacode.kazakov.kadr.domain.catalog.PhotoRepository;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingRepository;
@@ -27,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
- * Indexing: the embedding model, the task queue, the vectors and their index.
+ * Indexing and search: the embedding model, the task queue, the vectors and their index.
  */
 @Configuration(proxyBeanMethods = false)
 class IndexingConfiguration {
@@ -78,6 +79,11 @@ class IndexingConfiguration {
     @Bean
     VectorIndexUpdater vectorIndexUpdater(EmbeddingRepository embeddings, VectorIndex index, EmbeddingModel model) {
         return new VectorIndexUpdater(embeddings, index, model.id(), VectorIndexUpdater.Settings.DEFAULT);
+    }
+
+    @Bean
+    SearchService searchService(EmbeddingModel model, ImageDecoder decoder, VectorIndex index, PhotoRepository photos) {
+        return new SearchService(model, decoder, index, photos);
     }
 
     @Bean

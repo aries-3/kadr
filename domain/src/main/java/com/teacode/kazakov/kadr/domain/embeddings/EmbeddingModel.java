@@ -31,6 +31,19 @@ public interface EmbeddingModel {
     int imageSize();
 
     /**
+     * {@return how large to decode an image for the model: its shorter side kept at least this
+     * long, in pixels}
+     * <p>
+     * Decoding a large photo reduced reads every n-th pixel, which keeps less detail than scaling the
+     * whole photo down. Measured with SigLIP 2 on real photos, against decoding them whole, the
+     * vectors keep a similarity of 0.992 on average and 0.972 at worst at twice the model's input;
+     * 0.9994 and 0.998 at four times, for 20 ms more decoding a photo. So four times by default.
+     */
+    default int minDecodedSide() {
+        return 4 * imageSize();
+    }
+
+    /**
      * Computes the vectors of images.
      *
      * @param images upright RGB images of any size
