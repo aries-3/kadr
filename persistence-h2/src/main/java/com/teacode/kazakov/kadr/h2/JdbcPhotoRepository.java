@@ -1,19 +1,25 @@
 package com.teacode.kazakov.kadr.h2;
 
 import com.teacode.kazakov.kadr.domain.catalog.CatalogFile;
+import com.teacode.kazakov.kadr.domain.catalog.ContentHash;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryProgress;
 import com.teacode.kazakov.kadr.domain.catalog.PathRange;
+import com.teacode.kazakov.kadr.domain.catalog.Photo;
+import com.teacode.kazakov.kadr.domain.catalog.PhotoPage;
 import com.teacode.kazakov.kadr.domain.catalog.PhotoRepository;
 import com.teacode.kazakov.kadr.domain.catalog.ScannedFile;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -156,5 +162,72 @@ public final class JdbcPhotoRepository implements PhotoRepository {
                 .query((rs, row) -> new LibraryProgress(
                         rs.getLong("files"), rs.getLong("indexed"), rs.getLong("pending"), rs.getLong("failed")))
                 .single();
+    }
+
+    @Override
+    public Optional<Photo> findPhoto(long photoId) {
+        return jdbc.sql("SELECT content_hash FROM photo WHERE id = :id")
+                .param("id", photoId)
+                .query(String.class)
+                .optional()
+                .map(hash -> new Photo(photoId, new ContentHash(hash), jdbc.sql("""
+                                SELECT path FROM photo_file
+                                WHERE photo_id = :id AND NOT missing
+                                ORDER BY path
+                                """)
+                        .param("id", photoId)
+                        .query((rs, row) -> Path.of(rs.getString("path")))
+                        .list()));
+    }
+
+    @Override
+    public PhotoPage photos(PathRange range, long offset, int limit) {
+        long total = jdbc.sql("""
+                        SELECT COUNT(DISTINCT photo_id) FROM photo_file
+                        WHERE path >= :from AND path < :to AND NOT missing
+                        """)
+                .param("from", range.from())
+                .param("to", range.to())
+                .query(Long.class)
+                .single();
+        List<Long> ids = jdbc.sql("""
+                        SELECT photo_id FROM photo_file
+                        WHERE path >= :from AND path < :to AND NOT missing
+                        GROUP BY photo_id
+                        ORDER BY MIN(path), photo_id
+                        OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
+                        """)
+                .param("from", range.from())
+                .param("to", range.to())
+                .param("offset", offset)
+                .param("limit", limit)
+                .query(Long.class)
+                .list();
+        if (ids.isEmpty()) {
+            return new PhotoPage(total, List.of());
+        }
+        Map<Long, String> hashes = new HashMap<>();
+        Map<Long, List<Path>> files = new HashMap<>();
+        jdbc.sql("""
+                        SELECT f.photo_id, f.path, p.content_hash
+                        FROM photo_file f
+                        JOIN photo p ON p.id = f.photo_id
+                        WHERE f.photo_id IN (:ids) AND f.path >= :from AND f.path < :to AND NOT f.missing
+                        ORDER BY f.path
+                        """)
+                .param("ids", ids)
+                .param("from", range.from())
+                .param("to", range.to())
+                .query(rs -> {
+                    long id = rs.getLong("photo_id");
+                    hashes.put(id, rs.getString("content_hash"));
+                    files.computeIfAbsent(id, key -> new ArrayList<>()).add(Path.of(rs.getString("path")));
+                });
+        // A scan running meanwhile may have marked the last file of a photo missing: such a photo is left out
+        List<Photo> photos = ids.stream()
+                .filter(files::containsKey)
+                .map(id -> new Photo(id, new ContentHash(hashes.get(id)), List.copyOf(files.get(id))))
+                .toList();
+        return new PhotoPage(total, photos);
     }
 }

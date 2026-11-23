@@ -19,3 +19,10 @@ target/
 *.onnx
 *.mv.db
 *.trace.db
+
+# Node packages of the web module
+node_modules/
+
+# Pages and scripts the web module builds from src/main/pages and src/main/ts
+/web/src/main/resources/static/*.html
+/web/src/main/resources/static/js/

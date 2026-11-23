@@ -1,0 +1,8 @@
+<header class="top">
+  <a class="brand" href="./"><img src="favicon.svg" alt="" width="24" height="24">Kadr</a>
+  <nav>
+    {%- for item in navigation %}
+    <a href="{{ item.href }}"{% if item.id == nav %} aria-current="page"{% endif %}>{{ item.title }}</a>
+    {%- endfor %}
+  </nav>
+</header>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.teacode.kazakov.kadr</groupId>
+        <artifactId>kadr-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>kadr-web</artifactId>
+    <name>Kadr :: Web</name>
+    <description>Web interface: static pages with Alpine.js and TypeScript, served by the app</description>
+
+    <!--
+        No Java here. The jar holds static files under static/, which Spring Boot serves at the root.
+        All of them come from src/main/resources/static/: CSS and images are kept there, and
+        `npm run build` adds the pages and the scripts:
+        - src/main/pages/: page templates, built by Eleventy into static/*.html;
+        - src/main/ts/: TypeScript, bundled by esbuild into static/js/.
+        So the jar gets the same files whether Maven or a developer ran npm, and the IDE copies them
+        as any other resources. The built files are ignored by git and deleted by `mvn clean`.
+        TypeScript types of the API are generated from the contract in the app module into target/.
+        The npm scripts are in package.json.
+    -->
+
+    <properties>
+        <node.version>v24.22.3</node.version>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <!-- The built pages and scripts live in the sources, outside target/ -->
+                <artifactId>maven-clean-plugin</artifactId>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>src/main/resources/static</directory>
+                            <includes>
+                                <include>*.html</include>
+                                <include>js/**</include>
+                            </includes>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Node goes into target/; the download is cached in the local Maven repository -->
+                    <installDirectory>${project.build.directory}</installDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>install-node</id>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                        <configuration>
+                            <nodeVersion>${node.version}</nodeVersion>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- Exactly the versions in package-lock.json. Install scripts of the packages
+                             don't run: none is needed, esbuild's only speeds up its start -->
+                        <id>npm-ci</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>ci --ignore-scripts --no-audit --no-fund</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

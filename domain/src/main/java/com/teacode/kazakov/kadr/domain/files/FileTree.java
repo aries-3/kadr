@@ -30,4 +30,12 @@ public interface FileTree {
      * @param visitor       gets each photo file
      */
     void walk(Path folder, BooleanSupplier stopRequested, Consumer<FileEntry> visitor);
+
+    /**
+     * Checks that a file can be read, e.g. before serving it.
+     *
+     * @param file absolute path of the file
+     * @return {@code true} if it is a regular file, not a symbolic link, and can be read
+     */
+    boolean isReadable(Path file);
 }

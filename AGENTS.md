@@ -42,7 +42,7 @@ The agent immediately reflects every change it makes to files in the repository 
 | deleted a file | `git rm <path>` |
 
 - Stage by name only what the agent itself created or changed. Never `git add -A` or `git add .` — they pull in other people's changes and junk.
-- Never stage build artifacts, IDE settings, secrets, data or model files (`target/`, `.idea/`, `*.onnx`). They belong in `.gitignore`; if a rule is missing there, add it.
+- Never stage build artifacts, IDE settings, secrets, data or model files (`target/`, `node_modules/`, `.idea/`, `*.onnx`, the pages and scripts the web build writes to `web/src/main/resources/static`). They belong in `.gitignore`; if a rule is missing there, add it.
 - Files ignored by git (`.gitignore`, `.git/info/exclude`) are local on purpose — never force-add them with `git add -f`.
 - Before finishing a task, check `git status`: everything the agent did is staged, nothing extra is.
 

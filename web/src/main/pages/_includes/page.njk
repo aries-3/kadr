@@ -1,0 +1,19 @@
+{#- The frame of every page. A page sets in its front matter:
+    title  - the title in the browser tab;
+    nav    - the id of its item in the header menu, see _data/navigation.json; none for a page outside it;
+    script - its bundle in js/, built from src/main/ts/<script>.ts -#}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Kadr</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="kadr.css">
+  <script type="module" src="js/{{ script }}.js"></script>
+</head>
+<body>
+{% include "header.njk" %}
+{{ content | safe }}
+</body>
+</html>

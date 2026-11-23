@@ -3,6 +3,7 @@ package com.teacode.kazakov.kadr.app;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,23 @@ class KadrApplicationIT {
 
     @Test
     void apiEndpointsAnswerNotImplementedUntilTheirMilestone() {
-        assertThat(mvc.get().uri("/api/photos/1/file")).hasStatus(HttpStatus.NOT_IMPLEMENTED);
+        assertThat(mvc.post().uri("/api/search/text")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\": \"a dog\"}"))
+                .hasStatus(HttpStatus.NOT_IMPLEMENTED);
+    }
+
+    @Test
+    void servesTheWebInterface() {
+        assertThat(mvc.get().uri("/")).hasForwardedUrl("index.html");
+        // Pages built from the templates, each with the shared header and its own script
+        Map<String, String> scripts = Map.of(
+                "index.html", "js/libraries.js", "library.html", "js/library.js", "search.html", "js/search.js");
+        scripts.forEach((page, script) -> assertThat(mvc.get().uri("/" + page)).hasStatusOk()
+                .hasContentTypeCompatibleWith(MediaType.TEXT_HTML)
+                .bodyText().contains("<header class=\"top\">", script));
+        assertThat(mvc.get().uri("/js/libraries.js")).hasStatusOk();
+        assertThat(mvc.get().uri("/kadr.css")).hasStatusOk();
     }
 
     @Test

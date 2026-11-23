@@ -4,9 +4,10 @@ import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Photos and the files they are stored in, as scans see them.
+ * Photos and the files they are stored in.
  */
 public interface PhotoRepository {
 
@@ -52,4 +53,23 @@ public interface PhotoRepository {
      * @return the counts; missing files and their photos aren't counted
      */
     LibraryProgress progress(PathRange range, String enricherId);
+
+    /**
+     * Finds a photo with its present files.
+     *
+     * @param photoId catalog id of the photo
+     * @return the photo, or empty if there is no such photo
+     */
+    Optional<Photo> findPhoto(long photoId);
+
+    /**
+     * Lists the photos with a present file inside a folder, ordered by the path of the first such
+     * file. A photo stored in several places inside the folder is listed once.
+     *
+     * @param range  paths inside the folder
+     * @param offset number of photos to skip
+     * @param limit  maximum number of photos to return
+     * @return the page; each photo has only its present files inside the folder
+     */
+    PhotoPage photos(PathRange range, long offset, int limit);
 }

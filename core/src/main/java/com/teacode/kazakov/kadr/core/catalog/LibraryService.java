@@ -3,6 +3,7 @@ package com.teacode.kazakov.kadr.core.catalog;
 import com.teacode.kazakov.kadr.domain.catalog.Library;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryOverview;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryRepository;
+import com.teacode.kazakov.kadr.domain.catalog.PhotoPage;
 import com.teacode.kazakov.kadr.domain.catalog.PhotoRepository;
 import com.teacode.kazakov.kadr.domain.catalog.ScanState;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
@@ -16,7 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Folders added to the catalog: adding, listing, rescanning.
+ * Folders added to the catalog: adding, listing, rescanning, browsing their photos.
  */
 public final class LibraryService {
 
@@ -90,6 +91,17 @@ public final class LibraryService {
             scans.launch(libraryId);
         }
         return get(libraryId);
+    }
+
+    /**
+     * Lists the photos inside a folder, nested folders included, page by page.
+     *
+     * @param offset number of photos to skip
+     * @param limit  maximum number of photos to return
+     * @throws LibraryNotFoundException if there is no such folder
+     */
+    public PhotoPage photos(long libraryId, long offset, int limit) {
+        return photos.photos(find(libraryId).files(), offset, limit);
     }
 
     /**

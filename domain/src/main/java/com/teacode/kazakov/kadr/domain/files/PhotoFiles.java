@@ -2,6 +2,7 @@ package com.teacode.kazakov.kadr.domain.files;
 
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -9,7 +10,12 @@ import java.util.Set;
  */
 public final class PhotoFiles {
 
-    private static final Set<String> EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
+    /** Media types of the photo files by extension, lowercase. */
+    private static final Map<String, String> MEDIA_TYPES = Map.of(
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png",
+            "webp", "image/webp");
 
     /** Service folders of NAS systems and Windows, compared ignoring case. */
     private static final Set<String> SERVICE_FOLDERS = Set.of(
@@ -25,10 +31,22 @@ public final class PhotoFiles {
      * @return {@code true} if the file is a photo
      */
     public static boolean isPhoto(String fileName) {
-        int dot = fileName.lastIndexOf('.');
-        return !isHidden(fileName)
-                && dot > 0
-                && EXTENSIONS.contains(fileName.substring(dot + 1).toLowerCase(Locale.ROOT));
+        return !isHidden(fileName) && MEDIA_TYPES.containsKey(extension(fileName));
+    }
+
+    /**
+     * The media type of a photo file, by its extension.
+     *
+     * @param fileName name of the file, without its folder
+     * @return {@code image/jpeg}, {@code image/png} or {@code image/webp}
+     * @throws IllegalArgumentException if the extension isn't one of a photo
+     */
+    public static String mediaType(String fileName) {
+        String type = MEDIA_TYPES.get(extension(fileName));
+        if (type == null) {
+            throw new IllegalArgumentException("Not a photo file: " + fileName);
+        }
+        return type;
     }
 
     /**
@@ -64,5 +82,11 @@ public final class PhotoFiles {
 
     private static boolean isHidden(String name) {
         return name.startsWith(".");
+    }
+
+    /** Lowercase extension; empty if there is none, or the name only starts with a dot. */
+    private static String extension(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
     }
 }

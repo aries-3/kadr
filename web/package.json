@@ -1,0 +1,24 @@
+{
+  "name": "kadr-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run generate && npm run check && npm run bundle && npm run pages",
+    "generate": "openapi-typescript ../app/src/main/resources/openapi/kadr-api.yaml --output target/generated-sources/openapi/kadr-api.ts",
+    "check": "tsc",
+    "bundle": "esbuild src/main/ts/libraries.ts src/main/ts/library.ts src/main/ts/search.ts --bundle --format=esm --target=es2022 --sourcemap --log-level=warning --outdir=src/main/resources/static/js",
+    "pages": "eleventy --input=src/main/pages --output=src/main/resources/static --formats=njk --quiet",
+    "watch": "concurrently --kill-others --names scripts,pages \"npm:bundle -- --watch\" \"npm:pages -- --watch\""
+  },
+  "dependencies": {
+    "alpinejs": "3.17.5"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "3.1.8",
+    "@types/alpinejs": "3.17.0",
+    "concurrently": "10.0.7",
+    "esbuild": "0.28.2",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

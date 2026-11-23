@@ -13,7 +13,7 @@
 
     <artifactId>kadr-fs</artifactId>
     <name>Kadr :: File system</name>
-    <description>Folder walking and identity hash</description>
+    <description>Folder walking, identity hash, thumbnail store</description>
 
     <dependencies>
         <dependency>

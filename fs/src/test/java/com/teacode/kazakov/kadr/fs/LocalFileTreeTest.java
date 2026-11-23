@@ -143,6 +143,30 @@ class LocalFileTreeTest {
         }
     }
 
+    @Test
+    void aFileIsReadable() throws IOException {
+        assertThat(tree.isReadable(file("a.jpg"))).isTrue();
+    }
+
+    @Test
+    void whatIsNotARegularFileIsNotReadable() throws IOException {
+        Path photo = file("real/a.jpg");
+        Path link = Files.createSymbolicLink(folder.resolve("link.jpg"), photo);
+
+        assertThat(tree.isReadable(folder.resolve("absent.jpg"))).isFalse();
+        assertThat(tree.isReadable(photo.getParent())).isFalse();
+        assertThat(tree.isReadable(link)).isFalse();
+    }
+
+    @Test
+    void aFileWithoutPermissionIsNotReadable() throws IOException {
+        Path locked = file("a.jpg");
+        Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("---------"));
+        assumeFalse(Files.isReadable(locked), "running as root: permissions aren't enforced");
+
+        assertThat(tree.isReadable(locked)).isFalse();
+    }
+
     private List<FileEntry> walk() {
         List<FileEntry> files = new ArrayList<>();
         tree.walk(folder, () -> false, files::add);

@@ -1,0 +1,36 @@
+---
+layout: page.njk
+permalink: library.html
+title: Folder
+script: library
+---
+<main x-data="library" x-cloak>
+  <p class="crumbs"><a href="./">← All folders</a></p>
+
+  <template x-if="library">
+    <div>
+      <h1 x-text="library.path"></h1>
+      <p class="summary muted" x-text="`${statusLabel(library.status)} · ${photoCount(total)}`"></p>
+    </div>
+  </template>
+  <p class="error" x-show="error" x-text="error"></p>
+  <p class="empty" x-show="loaded && total === 0">No photos found in this folder yet.</p>
+
+  <ul class="grid">
+    <template x-for="(photo, index) in photos" :key="photo.id">
+      <li>
+        <button class="thumb" @click="view(index)" :title="photo.files[0].path">
+          <img :src="thumbnailUrl(photo.id)" :alt="fileName(photo.files[0].path)" loading="lazy"
+               @error="$el.hidden = true">
+        </button>
+      </li>
+    </template>
+  </ul>
+
+  <div class="more" x-show="photos.length < total">
+    <button class="secondary" @click="more" :disabled="loading">Show more</button>
+    <span class="muted" x-text="`${count(photos.length)} of ${count(total)}`"></span>
+  </div>
+</main>
+
+{% include "viewer.njk" %}

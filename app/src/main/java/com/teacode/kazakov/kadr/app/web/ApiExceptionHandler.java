@@ -3,6 +3,8 @@ package com.teacode.kazakov.kadr.app.web;
 import com.teacode.kazakov.kadr.core.catalog.InvalidFolderException;
 import com.teacode.kazakov.kadr.core.catalog.LibraryAlreadyAddedException;
 import com.teacode.kazakov.kadr.core.catalog.LibraryNotFoundException;
+import com.teacode.kazakov.kadr.core.photos.PhotoNotFoundException;
+import com.teacode.kazakov.kadr.core.photos.UndecodablePhotoException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -28,5 +30,15 @@ class ApiExceptionHandler {
     @ExceptionHandler
     ProblemDetail invalidFolder(InvalidFolderException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail photoNotFound(PhotoNotFoundException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail undecodablePhoto(UndecodablePhotoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 }

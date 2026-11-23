@@ -113,6 +113,49 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/libraries/{libraryId}/photos:
+    get:
+      tags: [Libraries]
+      operationId: listLibraryPhotos
+      summary: List the photos in a folder
+      description: |
+        Photos with a file present in the folder, nested folders included, ordered by the path of
+        their first such file. A photo stored in several places is listed once.
+      parameters:
+        - $ref: '#/components/parameters/LibraryId'
+        - name: offset
+          in: query
+          description: Number of photos to skip
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          description: Maximum number of photos to return
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: A page of photos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoPage'
+        '400':
+          description: The offset or the limit is out of range
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/search/text:
     post:
       tags: [Search]
@@ -212,6 +255,42 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/photos/{photoId}/thumbnail:
+    get:
+      tags: [Photos]
+      operationId: getPhotoThumbnail
+      summary: Get a thumbnail of a photo
+      description: |
+        A JPEG that fits in 512×512 pixels, turned upright as the EXIF orientation says. It is made
+        from one of the photo's files on the first request and kept in the data directory.
+
+        The response carries an `ETag`: a request with `If-None-Match` gets `304 Not Modified`
+        while the thumbnail is the same.
+      parameters:
+        - $ref: '#/components/parameters/PhotoId'
+      responses:
+        '200':
+          description: The thumbnail
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '304':
+          description: The thumbnail is the one the `If-None-Match` header names
+        '404':
+          description: There is no such photo, or none of its files can be read
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: The photo's file can't be decoded as an image
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
 components:
   parameters:
     LibraryId:
@@ -304,6 +383,36 @@ components:
         - `INDEXING` — the scan is finished, photos are waiting to be indexed
         - `READY` — everything found is indexed or failed
         - `UNAVAILABLE` — the folder can't be read, e.g. a disk is unmounted
+
+    PhotoPage:
+      type: object
+      required: [total, items]
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: Photos in the folder, on all pages
+          example: 12450
+        items:
+          type: array
+          description: Photos of this page; each has only its files inside the folder
+          items:
+            $ref: '#/components/schemas/Photo'
+
+    Photo:
+      type: object
+      required: [id, files]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1842
+        files:
+          type: array
+          description: Files of the photo present on disk, ordered by path
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PhotoFile'
 
     TextSearchRequest:
       type: object

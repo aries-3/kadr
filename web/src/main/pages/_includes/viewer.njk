@@ -1,0 +1,16 @@
+{#- The photo viewer; the page's script registers it with registerViewer(), see src/main/ts/viewer.ts -#}
+<dialog class="viewer" aria-label="Photo" x-data="viewer" @view-photos.window="open($event.detail)"
+        @keydown.left="previous" @keydown.right="next" @click.self="close">
+  <template x-if="current">
+    <figure>
+      <img :src="fileUrl(current.id)" :alt="fileName(current.path)">
+      <figcaption>
+        <span x-text="current.path"></span>
+        <span x-text="`${index + 1} / ${photos.length}`"></span>
+      </figcaption>
+    </figure>
+  </template>
+  <button class="viewer-button viewer-close" @click="close" aria-label="Close">✕</button>
+  <button class="viewer-button viewer-previous" @click="previous" x-show="index > 0" aria-label="Previous photo">‹</button>
+  <button class="viewer-button viewer-next" @click="next" x-show="index < photos.length - 1" aria-label="Next photo">›</button>
+</dialog>

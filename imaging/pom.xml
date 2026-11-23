@@ -20,5 +20,21 @@
             <groupId>com.teacode.kazakov.kadr</groupId>
             <artifactId>kadr-domain</artifactId>
         </dependency>
+
+        <!-- ImageIO plugins: JPEG (CMYK, damaged files) and WebP; PNG is read by the JDK itself -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-jpeg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+        </dependency>
+
+        <!-- EXIF orientation -->
+        <dependency>
+            <groupId>com.drewnoakes</groupId>
+            <artifactId>metadata-extractor</artifactId>
+        </dependency>
     </dependencies>
 </project>

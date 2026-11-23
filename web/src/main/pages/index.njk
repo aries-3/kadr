@@ -1,0 +1,43 @@
+---
+layout: page.njk
+permalink: index.html
+title: Folders
+nav: folders
+script: libraries
+---
+<main x-data="libraries" x-cloak>
+  <h1>Folders</h1>
+
+  <form class="bar" @submit.prevent="add">
+    <input type="text" x-model="path" required placeholder="/home/user/Pictures"
+           aria-label="Absolute path of a folder on the computer running Kadr">
+    <button :disabled="adding">Add folder</button>
+  </form>
+  <p class="error" x-show="error" x-text="error"></p>
+
+  <p class="empty" x-show="loaded && libraries.length === 0">
+    No folders yet. Add one by its absolute path on the computer running Kadr.
+  </p>
+
+  <ul class="libraries">
+    <template x-for="library in libraries" :key="library.id">
+      <li class="library">
+        <div class="library-head">
+          <a :href="`library.html?id=${library.id}`" x-text="library.path"></a>
+          <span class="status" :class="library.status.toLowerCase()" x-text="statusLabel(library.status)"></span>
+        </div>
+        <dl class="counts">
+          <div><dt>Files</dt><dd x-text="count(library.files)"></dd></div>
+          <div><dt>Indexed</dt><dd x-text="count(library.indexed)"></dd></div>
+          <div><dt>Pending</dt><dd x-text="count(library.pending)"></dd></div>
+          <div><dt>Failed</dt><dd x-text="count(library.failed)"></dd></div>
+        </dl>
+        <p class="error" x-show="library.scanError" x-text="library.scanError"></p>
+        <div class="library-foot">
+          <span class="muted" x-text="lastScan(library)"></span>
+          <button class="secondary" @click="rescan(library)" :disabled="library.status === 'SCANNING'">Rescan</button>
+        </div>
+      </li>
+    </template>
+  </ul>
+</main>

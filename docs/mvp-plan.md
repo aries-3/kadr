@@ -10,9 +10,9 @@ Build the MVP of Kadr — a local REST service that:
 - **F2** finds photos by a text query, Russian included;
 - **F3** finds photos similar to an uploaded image.
 
-Local only, CPU only, no UI. The MVP is done when the acceptance criteria in §6 pass on the owner's own photos.
+Local only, CPU only. The MVP is done when the acceptance criteria in §6 pass on the owner's own photos. A prototype of a web interface, with thumbnails, was added after M2 at the owner's request (see [Additions after M2](#additions-after-m2-web-interface-and-thumbnails)).
 
-Out of scope: video, HEIC and RAW, thumbnails, EXIF metadata and search filters, folder watching, removing folders from the index, tags and albums, Docker, authentication.
+Out of scope: video, HEIC and RAW, EXIF metadata and search filters, folder watching, removing folders from the index, tags and albums, Docker, authentication.
 
 ## 2. Design summary
 
@@ -33,12 +33,13 @@ kadr/
 ├── persistence-h2/    kadr-persistence-h2   adapter: JdbcClient repositories, Flyway migrations
 ├── index-lucene/      kadr-index-lucene     adapter: VectorIndex on Lucene
 ├── ml-onnx/           kadr-ml-onnx          adapter: EmbeddingModel on ONNX Runtime
-├── imaging/           kadr-imaging          adapter: decoding, EXIF orientation
-├── fs/                kadr-fs               adapter: folder walking, identity hash
+├── imaging/           kadr-imaging          adapter: decoding, EXIF orientation, thumbnails
+├── fs/                kadr-fs               adapter: folder walking, identity hash, thumbnail store
+├── web/               kadr-web              web interface: Eleventy templates, Alpine.js, TypeScript; no Java
 └── app/               kadr-app              Spring Boot application: REST, wiring, executable jar
 ```
 
-The modules are flat: they share nothing but the root POM. `domain` and `core` don't depend on Spring; adapters depend only on `domain` and not on each other; `app` wires everything.
+The modules are flat: they share nothing but the root POM. `domain` and `core` don't depend on Spring; adapters depend only on `domain` and not on each other; `app` wires everything. `web` holds static pages built by npm during the Maven build; `app` serves them.
 
 ## 3. Approach
 
@@ -147,6 +148,21 @@ Tests: scan scenarios on temporary folder trees — new, unchanged, modified, mo
 
 Done when: adding a real folder fills the catalog and the queue; a rescan finds exactly the changes; adding a subfolder of an indexed folder creates no new work.
 
+### Additions after M2: web interface and thumbnails
+
+Not in the original plan; added at the owner's request so the catalog can be browsed while the model work is pending.
+
+1. API, contract first:
+   - `GET /api/libraries/{id}/photos?offset=&limit=`: photos with a present file in the folder, ordered by the path of their first such file, a page of up to 500;
+   - `GET /api/photos/{id}/thumbnail`: a JPEG that fits in 512×512, upright by the EXIF orientation, made on the first request and kept in `<data-dir>/thumbnails/512/`; `ETag` is the content hash, so a browser revalidates and gets `304`; `422` if the file isn't a decodable image;
+   - `GET /api/photos/{id}/file` from M5.
+2. `kadr-imaging`: decoding with subsampling to about twice the thumbnail size, a pixel limit read from the header, EXIF orientation, halving downscale, JPEG encoding. This is the start of M1 task 2.
+3. `kadr-web`: static pages served by `app` — folders with their status, a folder's photos as a grid of thumbnails with a full-screen viewer, and search (answers "not implemented" until M5). Pages are Eleventy templates with Alpine.js directives, sharing the frame, the header and the viewer; logic in TypeScript, type-checked against types generated from the API contract; bundled by esbuild. `frontend-maven-plugin` downloads Node into `web/target/`, so the build still needs only a JDK.
+
+Done when: `./mvnw verify` is green; a folder added in the browser shows its photos upright, a broken file shows an empty tile, the viewer steps with the arrow keys.
+
+Later: thumbnails can be made during indexing (M3), from the image decoded for the embedding.
+
 ### M3. Indexing
 
 Tasks:
@@ -189,7 +205,7 @@ Tasks:
 3. `POST /api/search/image`:
    - over the size limit → `413`; unsupported format → `415`; too many pixels or undecodable → `400`;
    - the same decoding and preprocessing as indexing; the upload isn't stored.
-4. `GET /api/photos/{id}/file`: streams a present file of the photo with its content type; serves only files from the catalog.
+4. `GET /api/photos/{id}/file`: streams a present file of the photo with its content type; serves only files from the catalog. Done after M2, with the web interface.
 
 Tests: API and error codes with a fake model and index; an end-to-end IT with the real model — an image from the catalog finds itself first with a score above 0.99, a text query finds the expected test image.
 

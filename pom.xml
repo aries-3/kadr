@@ -27,6 +27,7 @@
         <module>ml-onnx</module>
         <module>imaging</module>
         <module>fs</module>
+        <module>web</module>
         <module>app</module>
     </modules>
 
@@ -47,6 +48,7 @@
 
         <!-- Plugins not managed by Spring Boot -->
         <openapi-generator.version>7.27.0</openapi-generator.version>
+        <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -85,6 +87,11 @@
             <dependency>
                 <groupId>com.teacode.kazakov.kadr</groupId>
                 <artifactId>kadr-fs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.teacode.kazakov.kadr</groupId>
+                <artifactId>kadr-web</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -160,6 +167,11 @@
                     <groupId>org.openapitools</groupId>
                     <artifactId>openapi-generator-maven-plugin</artifactId>
                     <version>${openapi-generator.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.github.eirslett</groupId>
+                    <artifactId>frontend-maven-plugin</artifactId>
+                    <version>${frontend-maven-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

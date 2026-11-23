@@ -6,12 +6,15 @@ import com.teacode.kazakov.kadr.domain.catalog.CatalogFile;
 import com.teacode.kazakov.kadr.domain.catalog.ContentHash;
 import com.teacode.kazakov.kadr.domain.catalog.LibraryProgress;
 import com.teacode.kazakov.kadr.domain.catalog.PathRange;
+import com.teacode.kazakov.kadr.domain.catalog.Photo;
+import com.teacode.kazakov.kadr.domain.catalog.PhotoPage;
 import com.teacode.kazakov.kadr.domain.catalog.ScannedFile;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -132,6 +135,67 @@ class JdbcPhotoRepositoryTest {
         record(file("/photos/a.jpg", 1));
 
         assertThat(photos.files(FOLDER)).noneMatch(CatalogFile::missing);
+    }
+
+    @Test
+    void findsAPhotoWithItsPresentFiles() {
+        record(file("/photos/b.jpg", 1), file("/photos/a.jpg", 1), file("/photos/c.jpg", 1));
+        photos.markMissing(List.of(fileId("/photos/c.jpg")));
+        long id = photoOf("/photos/a.jpg");
+
+        assertThat(photos.findPhoto(id)).contains(
+                new Photo(id, hash(1), List.of(Path.of("/photos/a.jpg"), Path.of("/photos/b.jpg"))));
+    }
+
+    @Test
+    void aPhotoWithAllFilesMissingHasNoFiles() {
+        record(file("/photos/a.jpg", 1));
+        photos.markMissing(List.of(fileId("/photos/a.jpg")));
+
+        assertThat(photos.findPhoto(photoOf("/photos/a.jpg"))).hasValueSatisfying(
+                photo -> assertThat(photo.files()).isEmpty());
+    }
+
+    @Test
+    void unknownPhotoIsNotFound() {
+        assertThat(photos.findPhoto(999)).isEmpty();
+    }
+
+    @Test
+    void listsThePhotosOfAFolderByPathPageByPage() {
+        record(file("/photos/c.jpg", 3),
+                file("/photos/2023/b.jpg", 2),
+                file("/photos/a.jpg", 1),
+                file("/photos/z/a-copy.jpg", 1),
+                file("/photos-old/d.jpg", 4));
+
+        PhotoPage first = photos.photos(FOLDER, 0, 2);
+        PhotoPage second = photos.photos(FOLDER, 2, 2);
+
+        assertThat(first.total()).isEqualTo(3);
+        assertThat(first.photos()).extracting(photo -> photo.files().getFirst().toString())
+                .containsExactly("/photos/2023/b.jpg", "/photos/a.jpg");
+        assertThat(first.photos().get(1).files()).as("both copies, in path order")
+                .containsExactly(Path.of("/photos/a.jpg"), Path.of("/photos/z/a-copy.jpg"));
+        assertThat(second.total()).isEqualTo(3);
+        assertThat(second.photos()).extracting(Photo::contentHash).containsExactly(hash(3));
+        assertThat(photos.photos(FOLDER, 3, 2).photos()).isEmpty();
+    }
+
+    @Test
+    void listedPhotosHaveOnlyTheirPresentFilesInsideTheFolder() {
+        record(file("/photos/2023/a.jpg", 1),
+                file("/photos/a-copy.jpg", 1),
+                file("/elsewhere/a-copy.jpg", 1),
+                file("/photos/2023/b.jpg", 2));
+        photos.markMissing(List.of(fileId("/photos/a-copy.jpg"), fileId("/photos/2023/b.jpg")));
+
+        PhotoPage page = photos.photos(PathRange.under(Path.of("/photos")), 0, 10);
+
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.photos()).singleElement()
+                .extracting(Photo::files).asInstanceOf(InstanceOfAssertFactories.LIST)
+                .containsExactly(Path.of("/photos/2023/a.jpg"));
     }
 
     private void record(ScannedFile... files) {

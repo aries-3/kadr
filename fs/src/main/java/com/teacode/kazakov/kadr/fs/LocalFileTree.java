@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -89,6 +90,11 @@ public final class LocalFileTree implements FileTree {
             // Not expected: the visitor handles every failure itself
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public boolean isReadable(Path file) {
+        return Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) && Files.isReadable(file);
     }
 
     private static String name(Path path) {

@@ -1,0 +1,37 @@
+---
+layout: page.njk
+permalink: search.html
+title: Search
+nav: search
+script: search
+---
+<main x-data="search" x-cloak>
+  <h1>Search</h1>
+
+  <form class="bar" @submit.prevent="byText">
+    <input type="search" x-model="query" required maxlength="1000" placeholder="собака на пляже на закате"
+           aria-label="What to look for, in any language">
+    <button :disabled="searching">Search</button>
+    <label class="button secondary">
+      By image…
+      <input type="file" accept="image/jpeg,image/png,image/webp" @change="byImage" hidden>
+    </label>
+  </form>
+  <p class="error" x-show="error" x-text="error"></p>
+  <p class="muted" x-show="searching">Searching…</p>
+  <p class="summary muted" x-show="!searching && !error && searchedFor" x-text="summary()"></p>
+
+  <ul class="grid">
+    <template x-for="(hit, index) in hits" :key="hit.photoId">
+      <li>
+        <button class="thumb" @click="view(index)" :title="hit.files[0].path">
+          <img :src="thumbnailUrl(hit.photoId)" :alt="fileName(hit.files[0].path)" loading="lazy"
+               @error="$el.hidden = true">
+          <span class="score" x-text="hit.score.toFixed(3)"></span>
+        </button>
+      </li>
+    </template>
+  </ul>
+</main>
+
+{% include "viewer.njk" %}
