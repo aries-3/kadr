@@ -1,9 +1,11 @@
 package com.teacode.kazakov.kadr.app.config;
 
 import com.teacode.kazakov.kadr.core.indexing.Indexer;
+import com.teacode.kazakov.kadr.core.indexing.VectorIndexUpdater;
 import com.teacode.kazakov.kadr.domain.catalog.PhotoRepository;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingRepository;
+import com.teacode.kazakov.kadr.domain.embeddings.VectorIndex;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import com.teacode.kazakov.kadr.domain.enrichment.EnrichmentQueue;
 import com.teacode.kazakov.kadr.domain.files.FileTree;
@@ -11,8 +13,11 @@ import com.teacode.kazakov.kadr.domain.images.ImageDecoder;
 import com.teacode.kazakov.kadr.h2.JdbcEmbeddingRepository;
 import com.teacode.kazakov.kadr.h2.JdbcEnrichmentQueue;
 import com.teacode.kazakov.kadr.imaging.ImageIoDecoder;
+import com.teacode.kazakov.kadr.lucene.LuceneVectorIndex;
 import com.teacode.kazakov.kadr.onnx.SiglipModel;
 import com.teacode.kazakov.kadr.onnx.SiglipModelFiles;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
- * Indexing: the embedding model, the task queue and the vectors.
+ * Indexing: the embedding model, the task queue, the vectors and their index.
  */
 @Configuration(proxyBeanMethods = false)
 class IndexingConfiguration {
@@ -57,6 +62,22 @@ class IndexingConfiguration {
     @Bean
     EmbeddingRepository embeddingRepository(JdbcTemplate jdbcTemplate, TransactionOperations transactionOperations) {
         return new JdbcEmbeddingRepository(jdbcTemplate, transactionOperations);
+    }
+
+    /**
+     * The vector index of the model, in {@code index/<model id>} of the data directory. Made anew,
+     * empty, when it is missing or unusable, and filled from the catalog by the updater. Committed
+     * and closed on shutdown, after the updater stops.
+     */
+    @Bean
+    VectorIndex vectorIndex(KadrProperties properties, EmbeddingModel model) throws IOException {
+        Path folder = properties.dataDir().resolve("index").resolve(model.id());
+        return LuceneVectorIndex.open(folder, model.id(), model.dimension());
+    }
+
+    @Bean
+    VectorIndexUpdater vectorIndexUpdater(EmbeddingRepository embeddings, VectorIndex index, EmbeddingModel model) {
+        return new VectorIndexUpdater(embeddings, index, model.id(), VectorIndexUpdater.Settings.DEFAULT);
     }
 
     @Bean

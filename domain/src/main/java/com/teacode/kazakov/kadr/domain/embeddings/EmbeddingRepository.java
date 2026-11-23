@@ -21,4 +21,25 @@ public interface EmbeddingRepository {
      * @param now        when they were made
      */
     void save(List<PhotoEmbedding> embeddings, String modelId, EnricherVersion enricher, Instant now);
+
+    /**
+     * Reads the vectors written after a given write, in the order they were written. As vectors
+     * are written by one thread, the write numbers become visible in order: none appears later
+     * below one already read.
+     *
+     * @param modelId the model
+     * @param seq     the write number to read after; 0 for all
+     * @param limit   the most vectors to read
+     * @return the vectors with their write numbers
+     */
+    List<StoredEmbedding> after(String modelId, long seq, int limit);
+
+    /**
+     * Counts the vectors written after a given write.
+     *
+     * @param modelId the model
+     * @param seq     the write number to count after; 0 for all
+     * @return how many
+     */
+    long countAfter(String modelId, long seq);
 }

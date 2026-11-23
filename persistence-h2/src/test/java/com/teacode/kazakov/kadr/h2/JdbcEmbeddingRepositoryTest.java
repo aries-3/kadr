@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.teacode.kazakov.kadr.domain.catalog.ContentHash;
 import com.teacode.kazakov.kadr.domain.catalog.ScannedFile;
 import com.teacode.kazakov.kadr.domain.embeddings.PhotoEmbedding;
+import com.teacode.kazakov.kadr.domain.embeddings.StoredEmbedding;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import com.teacode.kazakov.kadr.domain.enrichment.QueueCounts;
 import java.nio.ByteBuffer;
@@ -64,6 +65,30 @@ class JdbcEmbeddingRepositoryTest {
         assertThat(seq(a)).as("rewritten").isGreaterThan(seq(b));
         assertThat(vector(a)).containsExactly(0.5f);
         assertThat(sql.sql("SELECT COUNT(*) FROM embedding").query(Long.class).single()).isEqualTo(2);
+    }
+
+    @Test
+    void readsTheVectorsWrittenAfterAGivenWriteInTheirOrder() {
+        long a = photo(1);
+        long b = photo(2);
+        long c = photo(3);
+        embeddings.save(List.of(new PhotoEmbedding(a, new float[] {1, 0}), new PhotoEmbedding(b, new float[] {0, 1})),
+                MODEL, ENRICHER, NOW);
+        embeddings.save(List.of(new PhotoEmbedding(c, new float[] {0.6f, 0.8f})), MODEL, ENRICHER, NOW);
+        embeddings.save(List.of(new PhotoEmbedding(a, new float[] {0.8f, 0.6f})), MODEL, ENRICHER, NOW);
+        embeddings.save(List.of(new PhotoEmbedding(b, new float[] {1})), "another", ENRICHER, NOW);
+
+        List<StoredEmbedding> all = embeddings.after(MODEL, 0, 10);
+        List<StoredEmbedding> rest = embeddings.after(MODEL, all.get(0).seq(), 2);
+
+        assertThat(all).extracting(stored -> stored.embedding().photoId())
+                .as("a rewritten vector comes again, at its new place")
+                .containsExactly(b, c, a);
+        assertThat(all).extracting(StoredEmbedding::seq).isSorted();
+        assertThat(all.get(2).embedding().vector()).containsExactly(0.8f, 0.6f);
+        assertThat(rest).extracting(stored -> stored.embedding().photoId()).containsExactly(c, a);
+        assertThat(embeddings.countAfter(MODEL, 0)).isEqualTo(3);
+        assertThat(embeddings.countAfter(MODEL, all.get(2).seq())).isZero();
     }
 
     private long photo(int content) {

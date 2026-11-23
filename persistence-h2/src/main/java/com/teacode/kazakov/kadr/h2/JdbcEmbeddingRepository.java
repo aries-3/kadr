@@ -2,6 +2,7 @@ package com.teacode.kazakov.kadr.h2;
 
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingRepository;
 import com.teacode.kazakov.kadr.domain.embeddings.PhotoEmbedding;
+import com.teacode.kazakov.kadr.domain.embeddings.StoredEmbedding;
 import com.teacode.kazakov.kadr.domain.enrichment.EnricherVersion;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -10,6 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
@@ -18,10 +20,12 @@ import org.springframework.transaction.support.TransactionOperations;
  */
 public final class JdbcEmbeddingRepository implements EmbeddingRepository {
 
+    private final JdbcClient jdbc;
     private final JdbcTemplate batch;
     private final TransactionOperations tx;
 
     public JdbcEmbeddingRepository(JdbcTemplate jdbcTemplate, TransactionOperations tx) {
+        this.jdbc = JdbcClient.create(jdbcTemplate);
         this.batch = jdbcTemplate;
         this.tx = tx;
     }
@@ -53,6 +57,37 @@ public final class JdbcEmbeddingRepository implements EmbeddingRepository {
                         ps.setString(3, enricher.id());
                     });
         });
+    }
+
+    @Override
+    public List<StoredEmbedding> after(String modelId, long seq, int limit) {
+        return jdbc.sql("""
+                        SELECT photo_id, vector, seq FROM embedding
+                        WHERE model_id = :model AND seq > :seq
+                        ORDER BY seq
+                        FETCH FIRST :limit ROWS ONLY
+                        """)
+                .param("model", modelId)
+                .param("seq", seq)
+                .param("limit", limit)
+                .query((rs, row) -> new StoredEmbedding(
+                        new PhotoEmbedding(rs.getLong("photo_id"), floats(rs.getBytes("vector"))), rs.getLong("seq")))
+                .list();
+    }
+
+    @Override
+    public long countAfter(String modelId, long seq) {
+        return jdbc.sql("SELECT COUNT(*) FROM embedding WHERE model_id = :model AND seq > :seq")
+                .param("model", modelId)
+                .param("seq", seq)
+                .query(Long.class)
+                .single();
+    }
+
+    static float[] floats(byte[] bytes) {
+        float[] vector = new float[bytes.length / Float.BYTES];
+        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(vector);
+        return vector;
     }
 
     static byte[] bytes(float[] vector) {

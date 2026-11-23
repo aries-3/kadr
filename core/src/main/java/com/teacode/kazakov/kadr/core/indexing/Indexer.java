@@ -139,6 +139,9 @@ public final class Indexer {
             log.info("Indexing queue: interrupted tasks resumed {}, of an older version queued again {}, added {}",
                     recovery.resumed(), recovery.requeued(), recovery.created());
         }
+        QueueCounts counts = queue.counts(enricher);
+        log.info("Indexing {}: to go {}, indexed {}, failed {}",
+                enricher.id(), counts.pending(), counts.done(), counts.failed());
         ExecutorService decoding = Executors.newFixedThreadPool(settings.decodingThreads(),
                 Thread.ofPlatform().name("kadr-decode-", 1).daemon().factory());
         Progress progress = new Progress();

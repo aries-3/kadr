@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.jayway.jsonpath.JsonPath;
 import com.teacode.kazakov.kadr.domain.embeddings.EmbeddingModel;
+import com.teacode.kazakov.kadr.domain.embeddings.VectorIndex;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -42,6 +43,9 @@ class KadrApplicationIT {
 
     @Autowired
     MockMvcTester mvc;
+
+    @Autowired
+    VectorIndex vectorIndex;
 
     @Test
     void createsDataDirectoryWithCatalog() {
@@ -89,6 +93,8 @@ class KadrApplicationIT {
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
                 assertThat(mvc.get().uri("/api/libraries/{id}", id)).bodyJson()
                         .isLenientlyEqualTo("{\"status\": \"READY\", \"files\": 1, \"indexed\": 1}"));
+        // And the vector index takes the vector from the catalog
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(vectorIndex.size()).isEqualTo(1));
     }
 
     @Test

@@ -222,6 +222,17 @@ Tests on `ByteBuffersDirectory`: upsert and update; score conversion; commit use
 
 Done when: acceptance criterion 5 passes; killing the process during indexing loses nothing.
 
+Notes from the work:
+
+- Task 3 went another way: the indexer doesn't know about Lucene. `VectorIndexUpdater`, on a thread of its own, reads from H2 the vectors written after the last one the index has (`seq > lastSeq`, in `seq` order) and adds them, about once a second. One loop serves the live updates, the catch-up after a crash and the rebuild of a new index, which is the same loop from 0. It relies on one thread writing the vectors, so their `seq` numbers become visible in order.
+- Commits are rare, a minute or 10,000 vectors, and on shutdown: what isn't committed is read again from H2. The readers are refreshed at most once a second, on adding or searching.
+- An index that is missing, can't be read, or records another model, dimension or layout is deleted and made anew, holding its write lock, so the index of another running process is left alone; Lucene would otherwise read a damaged index even to replace it.
+- Ports: `VectorIndex` (`upsert`, `commit`, `search` returning the cosine, `durableSeq`, `size`); `EmbeddingRepository.after` and `countAfter`.
+- `BackgroundIndexing` runs the indexer and the updater; on shutdown the indexer stops first, then the updater takes the last vectors and commits.
+- On the owner's catalog the index was made from H2 on the first start: 4,014 vectors in 3.5 s, without the Vector API. Lucene also calls native code through the Foreign Function API, so the run command needs `--enable-native-access=ALL-UNNAMED` too, or Java 21 warns.
+- Recall: 1.000 for the ten nearest asking for 100, on 10,000 vectors of 768 values in groups, as the vectors of photos are; on vectors spread evenly over the sphere, the worst case for HNSW, 0.89. The test runs with the groups.
+- Tests: `LuceneVectorIndexTest` (search and scores, replacing, commit data, closing commits, a crash losing only what wasn't committed, another model or length, a damaged index, the lock of another process), `LuceneVectorIndexRecallIT`, `VectorIndexIT` in the app (the service's index following the catalog; criterion 5: an index made again in an empty folder finds the same; after a restart only the later vectors are added).
+
 ### M5. Search API
 
 Tasks:

@@ -136,6 +136,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- For spring-boot:run; a jar can't ask for these, the java command does. Lucene
+                         computes vector similarities with SIMD through the incubating Vector API, and
+                         calls native code through the Foreign Function API, allowed without a warning
+                         only to code named here -->
+                    <jvmArguments>--add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED</jvmArguments>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -7,7 +7,7 @@ A local photo catalog with semantic search: find photos by a text description or
 - Vector index — Apache Lucene (HNSW)
 - Embeddings — SigLIP 2 via ONNX Runtime, on CPU
 
-Status: early development, milestones M0–M3 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added; they are scanned into the catalog and their photos indexed in the background — turned into vectors by the embedding model — and can be browsed in the web interface. Search is not there yet: the search endpoints answer `501 Not Implemented`.
+Status: early development, milestones M0–M4 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added; they are scanned into the catalog and their photos indexed in the background — turned into vectors by the embedding model and put into a vector index — and can be browsed in the web interface. Search is not there yet: the search endpoints answer `501 Not Implemented`.
 
 ## Build
 
@@ -48,13 +48,15 @@ Two measurements run on photos of your own, which stay outside the repository:
 ## Run
 
 ```bash
-java -Xmx768m -jar app/target/kadr.jar
+java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx768m -jar app/target/kadr.jar
 ```
+
+Both flags are for the vector index, Lucene: `--add-modules jdk.incubator.vector` lets it use the SIMD instructions of the CPU — without it the index works, only slower, and Lucene warns about it; `--enable-native-access=ALL-UNNAMED` allows it to call native code, which Java 21 only warns about and later versions refuse. Running from the IDE, add them to the VM options; `./mvnw -pl app spring-boot:run` passes them itself.
 
 The service listens on `http://127.0.0.1:8080` and keeps its data in `~/.kadr`. Both can be changed:
 
 ```bash
-java -jar app/target/kadr.jar --kadr.data-dir=/path/to/data --server.port=8081
+java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx768m -jar app/target/kadr.jar --kadr.data-dir=/path/to/data --server.port=8081
 ```
 
 Open http://127.0.0.1:8080/ for the web interface.
@@ -69,6 +71,8 @@ Photos are indexed in the background, a few batches at a time; the log reports t
 | `batch-size` | `16` | photos the model takes at once |
 | `max-attempts` | `3` | attempts at a photo whose file can't be read; one that isn't an image fails at once |
 | `max-megapixels` | `100` | larger images aren't decoded and fail |
+
+The vectors are kept in the catalog; the vector index in `index/<model id>/` of the data directory follows it within a second. The index can be deleted while the service is stopped: on the next start it is made again from the catalog, without the model — 4,000 photos took 4 seconds on a laptop CPU; meanwhile searches find what is in it already. The same happens by itself when it is damaged or was made for another model.
 
 Health check:
 
