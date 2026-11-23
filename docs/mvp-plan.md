@@ -124,6 +124,21 @@ Tasks:
 
 Done when: the parity test passes; the throughput numbers are recorded; the quality check looks sane — or the owner decides to switch to a larger SigLIP 2 variant before going further.
 
+Notes from the work:
+
+- Ports: `EmbeddingModel` (batches of images and of texts) and `ImageDecoder` (a file → upright 8-bit RGB, reduced while decoding as far as the shorter side stays at least the given size). Decoding and inference are apart, for the M3 pipeline.
+- The service doesn't load the model yet: `SiglipModel.load` fails listing the missing files, as task 3 says, and the app wires it in M3, where it is first used.
+- Parity (`ReferencePixelsTest`, `ReferenceEmbeddingsIT`, reference made by `tools/reference/`): the token ids are the same; the vectors match to six places for all ten texts and seven of the eight images. The odd one is WebP, 0.994: Pillow's libwebp smooths the colors when it scales them up, the Java decoder doesn't. Thresholds: 0.9999, and 0.99 for WebP. The decoder gives Pillow's pixels byte for byte for all the other formats, the resize is a port of Pillow's. transformers 5 resizes with torchvision by default, so the reference uses its Pillow image processor.
+- Memory: the text tower takes 1.1–1.3 GB, 1.9 GB while loading, so it loads first; the whole model takes about 2 GB, 2.1 GB at the peak. The model tests are skipped with less than 2.5 GB of memory free.
+- DJL with `ai.djl.offline=true` makes no network calls: checked with `strace` in a network namespace without network.
+- Decoding keeps the shorter side at least **four** times the model input (896 px), not twice as task 2 says. Reading every n-th pixel keeps less detail than scaling the whole photo down: against decoding whole, the vectors keep a similarity of 0.992 on average and 0.972 at worst at twice the size; 0.9994 and 0.998 at four times. Decoding takes 139 ms a photo instead of 118: the JPEG is decoded whole either way. The M3 pipeline decodes with `4 × imageSize()`.
+- Throughput (`EmbeddingThroughputIT`, 32 of the owner's photos of 3.4 MB, Intel i5-3320M: 2 cores, 4 threads, AVX without AVX2):
+  - inference: 1.0 s a photo on 1 thread, 0.62 s on 2, 0.70 s on 4 — the second thread of a core only gets in the way; the batch size changes little;
+  - decoding alongside, batch 16: 1.55 photos/s at best, with 2 inference threads and 1–2 decoding threads — 10,000 photos in 1.8 hours, 100,000 in 18 hours;
+  - a search query: 176 ms median, 217 ms at worst on 2 threads; that leaves little of the 300 ms of acceptance criterion 9, and less while indexing runs;
+  - defaults for M3: inference threads = physical cores (2 here), 1–2 decoding threads, batch 16.
+- Quality (`EmbeddingQualityIT`, 114 of the owner's photos, 19 queries in Russian and the same in English): the owner judged the results good. Specific queries (a woman with a vacuum cleaner, children in a museum by a mannequin in uniform, a bicycle) find the same photos in both languages, well ahead of the rest; English scores higher in 16 of 19 and does better with vague queries. The base model stays.
+
 ### M2. Catalog and scanning (F1 without ML)
 
 Tasks:

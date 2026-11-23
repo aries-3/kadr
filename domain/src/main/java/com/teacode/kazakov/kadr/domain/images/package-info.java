@@ -1,5 +1,5 @@
 /**
- * Images made from photos: thumbnails, and where they are kept.
+ * Photos as images: decoded pixels, thumbnails and where they are kept.
  */
 @NullMarked
 package com.teacode.kazakov.kadr.domain.images;

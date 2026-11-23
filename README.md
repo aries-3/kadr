@@ -7,7 +7,7 @@ A local photo catalog with semantic search: find photos by a text description or
 - Vector index — Apache Lucene (HNSW)
 - Embeddings — SigLIP 2 via ONNX Runtime, on CPU
 
-Status: early development, milestone M2 of the [MVP plan](docs/mvp-plan.md). Folders can be added and are scanned into the catalog; their photos can be browsed in the web interface. Indexing and search are not there yet: the search endpoints answer `501 Not Implemented`.
+Status: early development, milestones M0–M2 of the [MVP plan](docs/mvp-plan.md) are done. Folders can be added and are scanned into the catalog; their photos can be browsed in the web interface. The embedding model runs and matches the reference implementation, but the service doesn't use it yet: indexing comes with M3, and the search endpoints answer `501 Not Implemented`.
 
 ## Build
 
@@ -15,6 +15,34 @@ Requires JDK 21; Maven is fetched by the Maven Wrapper, Node for the web interfa
 
 ```bash
 ./mvnw verify
+```
+
+## Model
+
+Photos and queries are turned into vectors by [SigLIP 2 base](https://huggingface.co/google/siglip2-base-patch16-224), exported to ONNX by [onnx-community](https://huggingface.co/onnx-community/siglip2-base-patch16-224-ONNX). The model files, about 1.5 GB, aren't in the repository; they go into `models/siglip2-base-patch16-224/` of the data directory:
+
+```bash
+M=~/.kadr/models/siglip2-base-patch16-224
+R=https://huggingface.co/onnx-community/siglip2-base-patch16-224-ONNX/resolve/main
+mkdir -p $M
+curl -L -o $M/vision_model.onnx $R/onnx/vision_model.onnx
+curl -L -o $M/text_model.onnx $R/onnx/text_model.onnx
+curl -L -o $M/tokenizer.json $R/tokenizer.json
+curl -L -o $M/preprocessor_config.json $R/preprocessor_config.json
+```
+
+Loaded, the model takes about 2 GB of memory. The build tests it when the files are there and that much memory is free, and skips those tests otherwise; `-Dkadr.model.dir=/path` points them to another folder.
+
+Two measurements run on photos of your own, which stay outside the repository:
+
+```bash
+# How fast photos are decoded and embedded with various settings; how long indexing would take
+./mvnw -pl ml-onnx -am verify -Dit.failIfNoSpecifiedTests=false \
+    -Dit.test=EmbeddingThroughputIT -Dkadr.benchmark.photos=/path/to/photos
+
+# The best five photos for each query in queries.txt of that folder, one query a line
+./mvnw -pl ml-onnx -am verify -Dit.failIfNoSpecifiedTests=false \
+    -Dit.test=EmbeddingQualityIT -Dkadr.quality.photos=/path/to/photos
 ```
 
 ## Run

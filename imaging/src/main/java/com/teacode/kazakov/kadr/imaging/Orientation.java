@@ -5,6 +5,7 @@ import com.drew.imaging.ImageProcessingException;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
 import com.drew.metadata.exif.ExifIFD0Directory;
+import com.teacode.kazakov.kadr.domain.images.RgbImage;
 import java.awt.geom.AffineTransform;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -80,5 +81,46 @@ enum Orientation {
             case TRANSVERSE -> new AffineTransform(0, -1, -1, 0, height, width);
             case ROTATE_270 -> new AffineTransform(0, -1, 1, 0, 0, width);
         };
+    }
+
+    /**
+     * Turns a stored image upright, moving the pixels as they are.
+     *
+     * @param image the stored image
+     * @return the upright image; the same one if it is stored upright
+     */
+    RgbImage upright(RgbImage image) {
+        if (this == NORMAL) {
+            return image;
+        }
+        int width = image.width();
+        int height = image.height();
+        int last = (height - 1) * width;
+        // Where the pixel (x, y) of the upright image is in the stored one:
+        // start + x × xStep + y × yStep, as an index of a pixel
+        int[] walk = switch (this) {
+            case NORMAL -> new int[] {0, 1, width};
+            case MIRROR_HORIZONTAL -> new int[] {width - 1, -1, width};
+            case ROTATE_180 -> new int[] {last + width - 1, -1, -width};
+            case MIRROR_VERTICAL -> new int[] {last, 1, -width};
+            case TRANSPOSE -> new int[] {0, width, 1};
+            case ROTATE_90 -> new int[] {last, -width, 1};
+            case TRANSVERSE -> new int[] {last + width - 1, -width, -1};
+            case ROTATE_270 -> new int[] {width - 1, width, -1};
+        };
+        int uprightWidth = swapsSides() ? height : width;
+        int uprightHeight = swapsSides() ? width : height;
+        byte[] stored = image.pixels();
+        byte[] upright = new byte[stored.length];
+        int i = 0;
+        for (int y = 0; y < uprightHeight; y++) {
+            int from = walk[0] + y * walk[2];
+            for (int x = 0; x < uprightWidth; x++, from += walk[1]) {
+                upright[i++] = stored[from * 3];
+                upright[i++] = stored[from * 3 + 1];
+                upright[i++] = stored[from * 3 + 2];
+            }
+        }
+        return new RgbImage(uprightWidth, uprightHeight, upright);
     }
 }
